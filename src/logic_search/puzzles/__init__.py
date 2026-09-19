@@ -1,0 +1,2 @@
+"""Puzzle domain implementations."""
+

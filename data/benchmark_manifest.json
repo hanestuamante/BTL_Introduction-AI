@@ -1,0 +1,95 @@
+{
+  "inputs": [
+    {
+      "difficulty": "easy",
+      "path": "pipes/pipes-3x3-easy-seed-101.json",
+      "sha256": "6b3d7b70f848ff1d930902fce484a5fbe983c9630ac6e548481ea7505c87a32a"
+    },
+    {
+      "difficulty": "easy",
+      "path": "futoshiki/futoshiki-4x4-easy-seed-201.json",
+      "sha256": "4ae5c8e2b2d2c87906a8769a8027c129bc442165ac7010949a25e39de889060d"
+    },
+    {
+      "difficulty": "easy",
+      "path": "pipes/pipes-3x3-easy-seed-102.json",
+      "sha256": "ac2285497581b2484c1faab86ec56f6259823cf57a699160a16e73ec411ce0a0"
+    },
+    {
+      "difficulty": "easy",
+      "path": "futoshiki/futoshiki-4x4-easy-seed-202.json",
+      "sha256": "5785bdf65c6bbc2cff015da03244be5cc21a47e2c10231f80617379fab018216"
+    },
+    {
+      "difficulty": "easy",
+      "path": "pipes/pipes-3x3-easy-seed-103.json",
+      "sha256": "600c0264f95cf82492b678d91e2dde31c9703f07c1cd9c87f3d3b24386ec2d72"
+    },
+    {
+      "difficulty": "easy",
+      "path": "futoshiki/futoshiki-4x4-easy-seed-203.json",
+      "sha256": "71bca2a6532c10664403a0b2b3426bcaf2b58b359b4684c2c07c5fa9250260fa"
+    },
+    {
+      "difficulty": "medium",
+      "path": "pipes/pipes-4x4-medium-seed-201.json",
+      "sha256": "f72e7301814e7bc2911cbdaaf220cffefb4bd619bfc10c9dd3bee9d36a0db799"
+    },
+    {
+      "difficulty": "medium",
+      "path": "futoshiki/futoshiki-5x5-medium-seed-301.json",
+      "sha256": "573dfe8048300edaa81a5b67c6cc5eb6c19fe1873bfbca0779efe72f98d0fd2f"
+    },
+    {
+      "difficulty": "medium",
+      "path": "pipes/pipes-4x4-medium-seed-202.json",
+      "sha256": "f77374bc1956d1379db819938b90b586b984cd8c79dc79f7398a054e55df26d3"
+    },
+    {
+      "difficulty": "medium",
+      "path": "futoshiki/futoshiki-5x5-medium-seed-302.json",
+      "sha256": "36d5854af961179a683eebb78326a3a33a425ad8204b038a34a9b8ca2d7e89ae"
+    },
+    {
+      "difficulty": "medium",
+      "path": "pipes/pipes-4x4-medium-seed-203.json",
+      "sha256": "93e75eed7619e6c47a313d3c5c9649eaa86cb63b9a76ed4fff3e9576197e17d1"
+    },
+    {
+      "difficulty": "medium",
+      "path": "futoshiki/futoshiki-5x5-medium-seed-303.json",
+      "sha256": "e643e7d2ac04a2a90d75c83c1b82fbe54086e4d5726783c3bfec9ff55c2bf69e"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-5x5-hard-seed-301.json",
+      "sha256": "f7bb77bccdd6244b606048f22209e145e791a42da6180bd575b013b1fdd90207"
+    },
+    {
+      "difficulty": "hard",
+      "path": "futoshiki/futoshiki-6x6-hard-seed-401.json",
+      "sha256": "f9208b5e308031f838cd48a92105ea10595a329939c1151dfeea91f311b14573"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-5x5-hard-seed-302.json",
+      "sha256": "fac7f1e74024a43744c99a6bc6a1364afe8055e7656a1f1cf72a7f4209436d19"
+    },
+    {
+      "difficulty": "hard",
+      "path": "futoshiki/futoshiki-6x6-hard-seed-402.json",
+      "sha256": "961b69c03aea3c318d5fc39ac56b9406d5910f72365e3f92eca967b54fb55d30"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-5x5-hard-seed-303.json",
+      "sha256": "3ddfda8ce78b2ea86df4b19ce9a0d3d32ee401c24c5924abbf4114d8faef2abf"
+    },
+    {
+      "difficulty": "hard",
+      "path": "futoshiki/futoshiki-6x6-hard-seed-403.json",
+      "sha256": "fbcf0bcb9bbd9f0608ff507e8984c945cefa598b08e782e3efb9725112832cb3"
+    }
+  ],
+  "schema_version": 1
+}

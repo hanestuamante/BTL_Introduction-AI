@@ -1,0 +1,127 @@
+{
+  "givens": [
+    [
+      4,
+      3,
+      2,
+      0
+    ],
+    [
+      1,
+      0,
+      3,
+      0
+    ],
+    [
+      3,
+      0,
+      1,
+      0
+    ],
+    [
+      2,
+      0,
+      4,
+      0
+    ]
+  ],
+  "id": "futoshiki-4x4-easy-seed-202",
+  "inequalities": [
+    {
+      "left": [
+        2,
+        2
+      ],
+      "op": "<",
+      "right": [
+        2,
+        3
+      ]
+    },
+    {
+      "left": [
+        3,
+        0
+      ],
+      "op": ">",
+      "right": [
+        3,
+        1
+      ]
+    },
+    {
+      "left": [
+        0,
+        0
+      ],
+      "op": ">",
+      "right": [
+        1,
+        0
+      ]
+    },
+    {
+      "left": [
+        1,
+        0
+      ],
+      "op": "<",
+      "right": [
+        1,
+        1
+      ]
+    },
+    {
+      "left": [
+        1,
+        3
+      ],
+      "op": "<",
+      "right": [
+        2,
+        3
+      ]
+    },
+    {
+      "left": [
+        2,
+        1
+      ],
+      "op": ">",
+      "right": [
+        3,
+        1
+      ]
+    },
+    {
+      "left": [
+        1,
+        1
+      ],
+      "op": ">",
+      "right": [
+        1,
+        2
+      ]
+    },
+    {
+      "left": [
+        0,
+        0
+      ],
+      "op": ">",
+      "right": [
+        0,
+        1
+      ]
+    }
+  ],
+  "metadata": {
+    "difficulty": "easy",
+    "generator": "latin-square-v1",
+    "seed": 202
+  },
+  "puzzle": "futoshiki",
+  "schema_version": 1,
+  "size": 4
+}
