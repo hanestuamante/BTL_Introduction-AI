@@ -25,6 +25,8 @@ def set_futoshiki_value(problem, state: tuple[int, ...], index: int, value: int)
 def rotate_pipe(problem, state: tuple[int, ...], index: int, turns: int = 1) -> tuple[int, ...]:
     if not 0 <= index < len(state):
         return state
+    if getattr(problem, "is_locked", None) and problem.is_locked(index):
+        return state
     values = list(state)
     values[index] = rotate_mask(values[index], turns)
     return tuple(values)
@@ -67,3 +69,24 @@ def pipes_conflicts(problem, state: tuple[int, ...]) -> set[int]:
         conflicts.update(range(len(state)))
     return conflicts
 
+
+def pipes_water(problem, state: tuple[int, ...]) -> set[int]:
+    source = getattr(problem, "source_index", 0)
+    if not 0 <= source < len(state):
+        return set()
+    seen = {source}
+    stack = [source]
+    while stack:
+        index = stack.pop()
+        mask = state[index]
+        for direction in DIRECTIONS:
+            bit, opposite = direction[2], direction[3]
+            if not mask & bit:
+                continue
+            neighbor = problem.neighbor(index, direction)
+            if neighbor is None or neighbor in seen:
+                continue
+            if state[neighbor] & opposite:
+                seen.add(neighbor)
+                stack.append(neighbor)
+    return seen
