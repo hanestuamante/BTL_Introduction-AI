@@ -89,6 +89,24 @@ Các tùy chọn: `--output`, `--difficulty` (một hoặc nhiều mức), `--co
 
 Script 'generate_inputs.py' giữ nguyên, song sẽ gọi generator Pipes mới này
 
+### Benchmark Pipes 6×6 wrap
+
+Chạy từ thư mục gốc repo để benchmark riêng 3 đề trong `data/generated-pipes-wrap/`:
+
+```bash
+PYTHONPATH=src python3 -m logic_search benchmark \
+  --manifest data/generated-pipes-wrap/benchmark_manifest.json \
+  --algorithms dfs gbfs \
+  --repeats 10 \
+  --timeout 60 \
+  --csv results/raw/pipes-wrap-6x6.csv \
+  --json results/raw/pipes-wrap-6x6.json
+```
+
+Lệnh xuất 60 kết quả đo (3 đề × 2 thuật toán × 10 lượt) ra CSV và JSON. Mỗi cặp đề/thuật toán có thêm một lượt warm-up và một lượt đo bộ nhớ riêng, không tính vào 60 kết quả. Timeout là 60 giây cho mỗi lượt.
+
+`scripts/run_benchmarks.py` vẫn dùng `data/benchmark_manifest.json` của bộ dữ liệu mặc định; dùng lệnh trên để chạy bộ 6×6 wrap.
+
 ## Kiểm thử và quality gate
 
 ```bash
