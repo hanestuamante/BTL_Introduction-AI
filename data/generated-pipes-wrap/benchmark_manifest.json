@@ -1,0 +1,20 @@
+{
+  "inputs": [
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-6x6-hard-wrap-locks-0.15-seed-242.json",
+      "sha256": "4fedfa83224a9ca6c001b24f6de86bc8183d2db10ab933d0152d306a8871bce4"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-6x6-hard-wrap-locks-0.15-seed-243.json",
+      "sha256": "f4b7fb95b2165b4ce3a3beb186c0bafb391b91b9a21b6562dbae04b0003b8687"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-6x6-hard-wrap-locks-0.15-seed-244.json",
+      "sha256": "696778b63c32d2794bcd15d84d0f0f08cdf4ffde3e473a382778620a2c29972d"
+    }
+  ],
+  "schema_version": 1
+}
