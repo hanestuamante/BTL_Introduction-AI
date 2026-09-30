@@ -69,6 +69,26 @@ python scripts/generate_inputs.py
 
 Generator Futoshiki xóa given nhưng chỉ giữ thay đổi nếu còn đúng một nghiệm. Pipes sinh cây khung trên lưới; validator đếm tối đa hai nghiệm trước khi nghiệm thu dataset. Seed, phiên bản generator và difficulty nằm trong metadata.
 
+### Sinh riêng dữ liệu Pipes
+
+Script riêng không sinh Futoshiki; mặc định ghi vào `data/generated-pipes/` để giữ bộ dữ liệu gốc:
+
+```bash
+python scripts/generate_pipes_inputs.py
+python scripts/generate_pipes_inputs.py --help
+```
+
+Ví dụ sinh 3 đề Pipes Hard 6×6 có nối biên và tối thiểu 15% ô khóa:
+
+```bash
+python scripts/generate_pipes_inputs.py --difficulty hard --rows 6 --cols 6 \
+  --wrap --lock-ratio 0.15 --count 3 --seed 42 --output data/generated-pipes-wrap
+```
+
+Các tùy chọn: `--output`, `--difficulty` (một hoặc nhiều mức), `--count`, `--seed`, `--rows`, `--cols`, `--wrap`, `--lock-ratio`, `--candidates`, `--node-limit`, `--overwrite`. Nối biên yêu cầu cả hai chiều >= 3. Script mặc định từ chối ghi đè; chỉ dùng `--overwrite` khi muốn thay thế file trùng tên và manifest. Manifest chỉ liệt kê đợt vừa sinh; các file khác được giữ lại.
+
+Script 'generate_inputs.py' giữ nguyên, song sẽ gọi generator Pipes mới này
+
 ## Kiểm thử và quality gate
 
 ```bash
@@ -96,7 +116,7 @@ Chi tiết quyết định nằm ở [docs/ADR-001.md](docs/ADR-001.md). Khung b
 
 ## Giới hạn
 
-- Chỉ hỗ trợ Pipes non-wrap.
+- Pipes hỗ trợ non-wrap, nối biên và ô khóa; nối biên yêu cầu cả hai chiều >= 3.
 - GBFS không đảm bảo đường đi tối ưu.
 - Peak memory là Python allocations do `tracemalloc`, không phải toàn bộ RSS.
 - File PDF/PPTX cuối cần nhóm điền thành viên, thông tin môn học và số liệu benchmark chính thức trước khi nộp.
