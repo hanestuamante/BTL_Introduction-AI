@@ -16,11 +16,15 @@ class MetricsPanel(ttk.LabelFrame):
 
     def update_event(self, event) -> None:
         self.variables["status"].set(event.type.value)
-        self.variables["elapsed"].set(f"{event.elapsed_ms:.1f} ms")
-        self.variables["generated"].set(str(event.nodes_generated))
-        self.variables["expanded"].set(str(event.nodes_expanded))
-        self.variables["pruned"].set(str(event.nodes_pruned))
-        self.variables["frontier"].set(str(event.frontier_size))
-        self.variables["depth"].set(str(event.depth))
-        self.variables["heuristic"].set(f"{event.h:g}")
+        if event.elapsed_ms >= 1000.0:
+            self.variables["elapsed"].set(f"{event.elapsed_ms / 1000.0:.2f} s")
+        else:
+            self.variables["elapsed"].set(f"{event.elapsed_ms:.2f} ms")
+        if event.nodes_generated > 0 or event.type not in {"CELL_DOMAIN", "VALUE_TRIED", "VALUE_REJECTED"}:
+            self.variables["generated"].set(str(event.nodes_generated))
+            self.variables["expanded"].set(str(event.nodes_expanded))
+            self.variables["pruned"].set(str(event.nodes_pruned))
+            self.variables["frontier"].set(str(event.frontier_size))
+            self.variables["depth"].set(str(event.depth))
+            self.variables["heuristic"].set(f"{event.h:g}")
 

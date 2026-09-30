@@ -29,6 +29,12 @@ class MainWindow:
         self.current_state: tuple[int, ...] | None = None
         self.history: list[tuple[int, ...]] = []
         self.selected: int | None = None
+        self.active_cell: int | None = None
+        self.active_kind: str | None = None
+        self.domain_values: tuple[int, ...] | None = None
+        self.active_value: int | None = None
+        self.cell_domains: dict[int, tuple[int, ...]] = {}
+        self.cell_rejected: dict[int, set[int]] = {}
         self.conflicts: set[int] = set()
         self.solution: tuple[int, ...] | None = None
         self.solved = False
@@ -41,6 +47,22 @@ class MainWindow:
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.root.after(30, self._poll)
         self.load()
+
+    def _clear_domain_state(self) -> None:
+        self.active_cell = None
+        self.active_kind = None
+        self.domain_values = None
+        self.active_value = None
+        self.cell_domains.clear()
+        self.cell_rejected.clear()
+
+    def _prune_inactive_cells(self, state: tuple[int, ...] | None, keep_cell: int | None = None) -> None:
+        if state is None:
+            return
+        for idx, val in enumerate(state):
+            if val == 0 and idx != keep_cell:
+                self.cell_rejected.pop(idx, None)
+                self.cell_domains.pop(idx, None)
 
     def _build(self) -> None:
         top = ttk.LabelFrame(self.root, text="Puzzle", padding=8)
@@ -77,7 +99,13 @@ class MainWindow:
         search.pack(fill="x", padx=10, pady=5)
         ttk.Label(search, text="Thuật toán:").pack(side="left")
         ttk.Combobox(search, textvariable=self.algorithm, values=("dfs", "gbfs"), state="readonly", width=7).pack(side="left", padx=5)
-        for text, command in (("▶ Chạy", self.run), ("⏸ Dừng", self.controller.pause), ("▷ Tiếp tục", self.controller.resume), ("→ Từng bước", self.step), ("⏹ Hủy", self.cancel_search)):
+        for text, command in (
+            ("▶ Chạy", self.run),
+            ("⏸ Dừng", self.pause_search),
+            ("▷ Tiếp tục", self.resume_search),
+            ("→ Từng bước", self.step),
+            ("⏹ Hủy", self.cancel_search),
+        ):
             ttk.Button(search, text=text, command=command).pack(side="left", padx=2)
         ttk.Label(search, text="Tốc độ:").pack(side="left", padx=(12, 2))
         ttk.Scale(search, from_=0.25, to=4.0, variable=self.speed, orient="horizontal", length=140).pack(side="left")
@@ -102,17 +130,28 @@ class MainWindow:
         self.current_state = initial_play_state(self.problem)
         self.history = [self.current_state]
         self.selected = None
+        self._clear_domain_state()
         self.conflicts = set()
         self.solution = None
         self.solved = False
         self._replace_canvas()
         if hasattr(self.problem, "size"):
             self._build_number_pad(self.problem.size)
-            self.help_label.configure(text="• Bấm ô trắng rồi nhập 1–N\n• Mỗi hàng/cột không trùng số\n• Thỏa dấu <, >, ∧, ∨\n• Backspace để xóa ô")
+            self.help_label.configure(
+                text="• [Space]: Dừng/Tiếp tục  • [→ / S]: Từng bước\n"
+                     "• [Enter]: Chạy  • [Esc]: Hủy tìm kiếm\n"
+                     "• Bấm ô trắng rồi nhập 1–N\n"
+                     "• Backspace/0 để xóa ô"
+            )
             self.status.set(f"Futoshiki {self.problem.size}×{self.problem.size}: chọn ô trắng để bắt đầu.")
         else:
             self._build_number_pad(0)
-            self.help_label.configure(text="• Bấm trái để xoay 90°\n• Bấm phải để xoay ngược\n• Mọi đầu ống phải khớp\n• Mạng ống là một cây liên thông")
+            self.help_label.configure(
+                text="• [Space]: Dừng/Tiếp tục  • [→ / S]: Từng bước\n"
+                     "• [Enter]: Chạy  • [Esc]: Hủy tìm kiếm\n"
+                     "• Bấm trái để xoay 90°\n"
+                     "• Bấm phải để xoay ngược"
+            )
             self.status.set(f"Pipes {self.problem.rows}×{self.problem.cols}: bấm vào ô để xoay ống.")
         self._draw()
 
@@ -136,7 +175,22 @@ class MainWindow:
 
     def _draw(self) -> None:
         if self.problem is not None and self.current_state is not None and hasattr(self.canvas, "draw"):
-            self.canvas.draw(self.problem, self.current_state, solved=self.solved, selected=self.selected, conflicts=self.conflicts)
+            kwargs = {
+                "solved": self.solved,
+                "selected": self.selected,
+                "conflicts": self.conflicts,
+            }
+            if hasattr(self.problem, "size"):
+                kwargs["active_cell"] = self.active_cell
+                kwargs["active_kind"] = self.active_kind
+                kwargs["domain_values"] = self.domain_values
+                kwargs["active_value"] = self.active_value
+                kwargs["rejected_values"] = (
+                    self.cell_rejected.get(self.active_cell, set())
+                    if self.active_cell is not None
+                    else set()
+                )
+            self.canvas.draw(self.problem, self.current_state, **kwargs)
 
     def _remember(self, new_state: tuple[int, ...]) -> None:
         if new_state != self.current_state:
@@ -153,6 +207,7 @@ class MainWindow:
         index = self.canvas.cell_at(event.x, event.y)
         if index is None:
             return
+        self._clear_domain_state()
         self.selected = index
         if hasattr(self.problem, "size"):
             if self.problem.givens[index]:
@@ -165,12 +220,31 @@ class MainWindow:
             self.status.set("Đã xoay ống. Nhấn ‘Kiểm tra’ khi mạng đã nối hoàn chỉnh.")
 
     def _on_key(self, event) -> None:
+        if isinstance(event.widget, (ttk.Entry, tk.Entry)):
+            return
+
+        key = event.keysym
+        char = event.char
+
+        if key == "space":
+            self.toggle_pause()
+            return
+        if key in {"Right", "s", "S"}:
+            self.step()
+            return
+        if key == "Return":
+            self.run()
+            return
+        if key == "Escape":
+            self.cancel_search()
+            return
+
         if self.problem is None or self.current_state is None or self.selected is None or not hasattr(self.problem, "size"):
             return
-        if event.keysym in {"BackSpace", "Delete", "0"}:
+        if key in {"BackSpace", "Delete", "0"}:
             value = 0
-        elif event.char.isdigit() and 1 <= int(event.char) <= self.problem.size:
-            value = int(event.char)
+        elif char.isdigit() and 1 <= int(char) <= self.problem.size:
+            value = int(char)
         else:
             return
         self._enter_value(value)
@@ -179,6 +253,7 @@ class MainWindow:
         if self.problem is None or self.current_state is None or self.selected is None or not hasattr(self.problem, "size"):
             self.status.set("Hãy chọn một ô trắng trước khi nhập số.")
             return
+        self._clear_domain_state()
         updated = set_futoshiki_value(self.problem, self.current_state, self.selected, value)
         self._remember(updated)
         self.conflicts = futoshiki_conflicts(self.problem, updated)
@@ -235,11 +310,35 @@ class MainWindow:
         else:
             self.status.set(f"Gợi ý: hướng đúng cho ô hàng {index // self.problem.cols + 1}, cột {index % self.problem.cols + 1}.")
 
+    def pause_search(self) -> None:
+        if self.controller.state.running and not self.controller.state.paused:
+            self.controller.pause()
+            self.status.set("Đã tạm dừng tìm kiếm. Nhấn ‘Tiếp tục’ hoặc [Space] để tiếp tục.")
+
+    def resume_search(self) -> None:
+        if self.controller.state.running and self.controller.state.paused:
+            self.controller.resume()
+            self.status.set(f"Đang tiếp tục tìm kiếm {self.algorithm.get().upper()}…")
+        elif not self.controller.state.running:
+            self.run()
+
+    def toggle_pause(self) -> None:
+        if not self.controller.state.running:
+            self.run()
+        elif self.controller.state.paused:
+            self.resume_search()
+        else:
+            self.pause_search()
+
     def run(self) -> None:
         if self.problem is None:
             return
+        if self.controller.state.running and self.controller.state.paused:
+            self.resume_search()
+            return
         self.history = []
         self.conflicts = set()
+        self._clear_domain_state()
         self.solved = False
         self.status.set(f"Đang chạy {self.algorithm.get().upper()}…")
         self.controller.start(self.problem, self.algorithm.get())
@@ -250,14 +349,18 @@ class MainWindow:
         if not self.controller.state.running:
             self.history = []
             self.conflicts = set()
+            self._clear_domain_state()
             self.solved = False
+            self.status.set("Step mode: bắt đầu từng bước…")
             self.controller.start(self.problem, self.algorithm.get(), paused=True)
         self.controller.step()
-        self.status.set("Step mode: mở rộng thêm một node.")
+        self.status.set("Step mode: thực hiện 1 thao tác.")
 
     def cancel_search(self) -> None:
         self.controller.cancel()
+        self._clear_domain_state()
         self.status.set("Đã hủy quá trình tìm kiếm.")
+        self._draw()
 
     def back(self) -> None:
         if len(self.history) > 1:
@@ -265,6 +368,7 @@ class MainWindow:
             self.current_state = self.history[-1]
             self.conflicts = set()
             self.solved = False
+            self._clear_domain_state()
             self._draw()
             self.status.set("Đã quay lại trạng thái trước.")
 
@@ -274,6 +378,7 @@ class MainWindow:
             self.current_state = initial_play_state(self.problem)
             self.history = [self.current_state]
             self.selected = None
+            self._clear_domain_state()
             self.conflicts = set()
             self.solved = False
             self._draw()
@@ -281,21 +386,89 @@ class MainWindow:
 
     def _handle_event(self, event) -> None:
         self.metrics.update_event(event)
-        if event.state is not None and event.type in {EventType.STARTED, EventType.NODE_EXPANDED, EventType.GOAL_FOUND}:
+        if event.type == EventType.CELL_DOMAIN:
+            self.active_cell = event.cell
+            self.active_kind = "domain"
+            self.domain_values = event.domain
+            self.active_value = None
+            if event.cell is not None:
+                if event.domain is not None:
+                    self.cell_domains[event.cell] = event.domain
+                self.cell_rejected[event.cell] = set()
+            self._prune_inactive_cells(self.current_state, keep_cell=event.cell)
+            if event.message:
+                self.status.set(event.message)
+            self._draw()
+        elif event.type == EventType.VALUE_TRIED:
+            if event.state is not None:
+                self.current_state = event.state
+            self.active_cell = event.cell
+            self.active_kind = "trial"
+            self.active_value = event.value
+            self.domain_values = event.domain or self.cell_domains.get(event.cell)
+            if event.cell is not None and event.domain is not None:
+                self.cell_domains[event.cell] = event.domain
+            if event.message:
+                self.status.set(event.message)
+            self._draw()
+        elif event.type == EventType.VALUE_REJECTED:
+            if event.state is not None:
+                self.current_state = event.state
+            self.active_cell = event.cell
+            self.active_kind = "rejected"
+            self.domain_values = event.domain or self.cell_domains.get(event.cell)
+            if event.cell is not None:
+                if event.domain is not None:
+                    self.cell_domains[event.cell] = event.domain
+                if event.reason in {"all_failed", "empty_domain"} or (event.value is None and event.domain is not None):
+                    self.cell_rejected[event.cell] = set(event.domain or ())
+                    self.active_value = None
+                elif event.value is not None:
+                    self.active_value = event.value
+                    self.cell_rejected.setdefault(event.cell, set()).add(event.value)
+            self._prune_inactive_cells(self.current_state, keep_cell=event.cell)
+            if event.message:
+                self.status.set(event.message)
+            self._draw()
+        elif event.state is not None and event.type in {EventType.STARTED, EventType.NODE_EXPANDED, EventType.GOAL_FOUND}:
             self.current_state = event.state
             self.history.append(event.state)
             self.solved = event.type == EventType.GOAL_FOUND
+            self.active_kind = None
+            if event.type == EventType.NODE_EXPANDED and event.action is not None and hasattr(event.action, "__getitem__"):
+                self.active_cell = event.action[0]
+                self.active_value = event.action[1]
+                self.domain_values = self.cell_domains.get(self.active_cell)
+                self._prune_inactive_cells(self.current_state, keep_cell=self.active_cell)
+            elif event.type == EventType.GOAL_FOUND:
+                self._clear_domain_state()
             self._draw()
+        elif event.type == EventType.NODE_PRUNED:
+            if event.state is not None:
+                self.current_state = event.state
+            self.active_kind = "rejected"
+            if event.action is not None and hasattr(event.action, "__getitem__"):
+                self.active_cell = event.action[0]
+                self.active_value = event.action[1]
+                self.domain_values = self.cell_domains.get(self.active_cell)
+                if self.active_cell is not None and self.active_value is not None:
+                    self.cell_rejected.setdefault(self.active_cell, set()).add(self.active_value)
+            self._prune_inactive_cells(self.current_state, keep_cell=self.active_cell)
+            if event.message:
+                self.status.set(f"Ngõ cụt: {event.message}")
+            self._draw()
+
         if event.type == EventType.GOAL_FOUND:
-            self.status.set("Thuật toán đã tìm thấy nghiệm.")
+            self.status.set("🎉 Thuật toán đã tìm thấy nghiệm.")
         elif event.type == EventType.FINISHED and event.message != "solved":
             self.status.set(f"Tìm kiếm kết thúc: {event.message}.")
         elif event.type == EventType.ERROR:
             messagebox.showerror("Lỗi tìm kiếm", event.message)
 
     def _poll(self) -> None:
-        self.controller.poll(self._handle_event, max(1, int(self.speed.get())))
-        self.root.after(max(20, int(140 / self.speed.get())), self._poll)
+        self.controller.poll(self._handle_event, limit=1)
+        delay = max(20, int(150 / max(0.1, self.speed.get())))
+        self.root.after(delay, self._poll)
 
     def close(self) -> None:
         self.controller.cancel()

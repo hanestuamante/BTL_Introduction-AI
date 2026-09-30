@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Any, Iterable
+
+from logic_search.core.events import EventType
 
 FutoshikiState = tuple[int, ...]
 FutoshikiAction = tuple[int, int]
@@ -66,16 +68,64 @@ class FutoshikiProblem:
                 return False
         return all(state[i] or self.domain(state, i) for i in range(n * n))
 
-    def actions(self, state: FutoshikiState) -> Iterable[FutoshikiAction]:
+    def actions(self, state: FutoshikiState, emitter: Any = None, **kwargs: Any) -> Iterable[FutoshikiAction]:
         try:
             index = state.index(0)
         except ValueError:
             return ()
+        domain_values = self.domain(state, index)
+        r, c = divmod(index, self.size)
+        if emitter is not None:
+            emitter.emit(
+                EventType.CELL_DOMAIN,
+                state=state,
+                cell=index,
+                domain=domain_values,
+                message=f"Xét ô hàng {r + 1}, cột {c + 1}: domain = {{{', '.join(map(str, domain_values))}}}",
+                **kwargs,
+            )
+        if not domain_values:
+            if emitter is not None:
+                emitter.emit(
+                    EventType.VALUE_REJECTED,
+                    state=state,
+                    cell=index,
+                    domain=tuple(range(1, self.size + 1)),
+                    reason="empty_domain",
+                    message=f"Ô hàng {r + 1}, cột {c + 1} không còn số hợp lệ nào",
+                    **kwargs,
+                )
+            return ()
+
         actions: list[FutoshikiAction] = []
-        for value in self.domain(state, index):
+        for value in domain_values:
             candidate = self.result(state, (index, value))
+            if emitter is not None:
+                emitter.emit(
+                    EventType.VALUE_TRIED,
+                    state=candidate,
+                    cell=index,
+                    value=value,
+                    domain=domain_values,
+                    action=(index, value),
+                    message=f"Thử điền {value} vào ô hàng {r + 1}, cột {c + 1}",
+                    **kwargs,
+                )
             if self.is_consistent(candidate):
                 actions.append((index, value))
+            else:
+                if emitter is not None:
+                    emitter.emit(
+                        EventType.VALUE_REJECTED,
+                        state=state,
+                        cell=index,
+                        value=value,
+                        domain=domain_values,
+                        action=(index, value),
+                        reason="conflict",
+                        message=f"Loại {value} tại ô hàng {r + 1}, cột {c + 1} (vi phạm ràng buộc)",
+                        **kwargs,
+                    )
         return actions
 
     def result(self, state: FutoshikiState, action: FutoshikiAction) -> FutoshikiState:

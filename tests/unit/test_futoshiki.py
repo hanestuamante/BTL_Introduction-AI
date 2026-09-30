@@ -29,3 +29,20 @@ def test_goal_validation():
     solution = (1, 2, 3, 4, 2, 4, 1, 3, 3, 1, 4, 2, 4, 3, 2, 1)
     assert problem.is_goal(solution)
     assert validate_solution(problem, solution)
+
+
+def test_actions_emits_micro_events():
+    from logic_search.core.events import EventEmitter, EventType
+
+    problem = parse_futoshiki(fixture())
+    events = []
+    emitter = EventEmitter(callback=events.append, detailed=True)
+    actions = list(problem.actions(problem.initial_state, emitter=emitter))
+    assert actions
+    event_types = [e.type for e in events]
+    assert EventType.CELL_DOMAIN in event_types
+    assert EventType.VALUE_TRIED in event_types
+    domain_event = next(e for e in events if e.type == EventType.CELL_DOMAIN)
+    assert domain_event.domain is not None and len(domain_event.domain) > 0
+    tried_event = next(e for e in events if e.type == EventType.VALUE_TRIED)
+    assert tried_event.domain is not None and len(tried_event.domain) > 0
