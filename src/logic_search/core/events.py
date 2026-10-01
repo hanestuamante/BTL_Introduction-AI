@@ -20,6 +20,8 @@ class EventType(str, Enum):
 class SearchEvent:
     type: EventType
     elapsed_ms: float
+    node_id: int | None = None
+    parent_id: int | None = None
     state_key: Hashable | None = None
     state: Any = None
     action: Any = None
