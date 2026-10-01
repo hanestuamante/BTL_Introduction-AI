@@ -1,0 +1,206 @@
+{
+  "cols": 8,
+  "id": "pipes-8x8-hard-wrap-seed-801",
+  "initial_rotations": [
+    [
+      1,
+      1,
+      0,
+      0,
+      3,
+      1,
+      0,
+      0
+    ],
+    [
+      2,
+      2,
+      3,
+      1,
+      1,
+      2,
+      1,
+      0
+    ],
+    [
+      1,
+      1,
+      2,
+      0,
+      1,
+      0,
+      3,
+      0
+    ],
+    [
+      1,
+      1,
+      3,
+      2,
+      0,
+      0,
+      1,
+      1
+    ],
+    [
+      0,
+      1,
+      3,
+      3,
+      0,
+      0,
+      3,
+      2
+    ],
+    [
+      0,
+      2,
+      3,
+      3,
+      2,
+      1,
+      1,
+      2
+    ],
+    [
+      1,
+      0,
+      3,
+      2,
+      0,
+      3,
+      3,
+      1
+    ],
+    [
+      1,
+      1,
+      0,
+      1,
+      1,
+      1,
+      1,
+      0
+    ]
+  ],
+  "metadata": {
+    "actual_locked_count": 0,
+    "candidates": 24,
+    "difficulty": "hard",
+    "difficulty_method": "min_expanded_plus_total_expanded_div_10",
+    "difficulty_score": 2400.0,
+    "generator": "kruskal-solver-ranked-unique-v3",
+    "initial_ambiguity": 175,
+    "node_limit": 20000,
+    "requested_lock_ratio": 0.0,
+    "requested_locked_count": 0,
+    "scramble_ratio": 1.0,
+    "scrambled_cells": 63,
+    "seed": 801,
+    "solver_effort": {
+      "dfs": {
+        "max_frontier_size": 12,
+        "nodes_expanded": 2000,
+        "nodes_pruned": 267,
+        "solution_depth": null,
+        "status": "cancelled"
+      },
+      "gbfs": {
+        "max_frontier_size": 12,
+        "nodes_expanded": 2000,
+        "nodes_pruned": 260,
+        "solution_depth": null,
+        "status": "cancelled"
+      }
+    },
+    "solver_node_budget": 2000,
+    "unique_solution": true,
+    "uniqueness_nodes": 82
+  },
+  "puzzle": "pipes",
+  "rows": 8,
+  "schema_version": 1,
+  "tiles": [
+    [
+      "END",
+      "END",
+      "END",
+      "END",
+      "END",
+      "TEE",
+      "CORNER",
+      "END"
+    ],
+    [
+      "TEE",
+      "TEE",
+      "TEE",
+      "STRAIGHT",
+      "TEE",
+      "CORNER",
+      "CORNER",
+      "TEE"
+    ],
+    [
+      "CORNER",
+      "END",
+      "TEE",
+      "CORNER",
+      "END",
+      "END",
+      "TEE",
+      "STRAIGHT"
+    ],
+    [
+      "STRAIGHT",
+      "STRAIGHT",
+      "END",
+      "END",
+      "STRAIGHT",
+      "CORNER",
+      "CORNER",
+      "END"
+    ],
+    [
+      "CROSS",
+      "TEE",
+      "CORNER",
+      "CORNER",
+      "TEE",
+      "TEE",
+      "END",
+      "END"
+    ],
+    [
+      "TEE",
+      "END",
+      "END",
+      "END",
+      "END",
+      "CORNER",
+      "TEE",
+      "TEE"
+    ],
+    [
+      "END",
+      "END",
+      "CORNER",
+      "TEE",
+      "TEE",
+      "TEE",
+      "TEE",
+      "CORNER"
+    ],
+    [
+      "CORNER",
+      "CORNER",
+      "CORNER",
+      "END",
+      "END",
+      "STRAIGHT",
+      "CORNER",
+      "STRAIGHT"
+    ]
+  ],
+  "wrap": true
+}

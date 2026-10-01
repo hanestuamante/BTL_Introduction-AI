@@ -2,18 +2,8 @@
   "inputs": [
     {
       "difficulty": "easy",
-      "path": "pipes/pipes-3x3-easy-seed-101.json",
-      "sha256": "6b3d7b70f848ff1d930902fce484a5fbe983c9630ac6e548481ea7505c87a32a"
-    },
-    {
-      "difficulty": "easy",
       "path": "futoshiki/futoshiki-4x4-easy-seed-201.json",
       "sha256": "4ae5c8e2b2d2c87906a8769a8027c129bc442165ac7010949a25e39de889060d"
-    },
-    {
-      "difficulty": "easy",
-      "path": "pipes/pipes-3x3-easy-seed-102.json",
-      "sha256": "ac2285497581b2484c1faab86ec56f6259823cf57a699160a16e73ec411ce0a0"
     },
     {
       "difficulty": "easy",
@@ -22,18 +12,8 @@
     },
     {
       "difficulty": "easy",
-      "path": "pipes/pipes-3x3-easy-seed-103.json",
-      "sha256": "600c0264f95cf82492b678d91e2dde31c9703f07c1cd9c87f3d3b24386ec2d72"
-    },
-    {
-      "difficulty": "easy",
       "path": "futoshiki/futoshiki-4x4-easy-seed-203.json",
       "sha256": "71bca2a6532c10664403a0b2b3426bcaf2b58b359b4684c2c07c5fa9250260fa"
-    },
-    {
-      "difficulty": "medium",
-      "path": "pipes/pipes-4x4-medium-seed-201.json",
-      "sha256": "f72e7301814e7bc2911cbdaaf220cffefb4bd619bfc10c9dd3bee9d36a0db799"
     },
     {
       "difficulty": "medium",
@@ -42,18 +22,8 @@
     },
     {
       "difficulty": "medium",
-      "path": "pipes/pipes-4x4-medium-seed-202.json",
-      "sha256": "f77374bc1956d1379db819938b90b586b984cd8c79dc79f7398a054e55df26d3"
-    },
-    {
-      "difficulty": "medium",
       "path": "futoshiki/futoshiki-5x5-medium-seed-302.json",
       "sha256": "36d5854af961179a683eebb78326a3a33a425ad8204b038a34a9b8ca2d7e89ae"
-    },
-    {
-      "difficulty": "medium",
-      "path": "pipes/pipes-4x4-medium-seed-203.json",
-      "sha256": "93e75eed7619e6c47a313d3c5c9649eaa86cb63b9a76ed4fff3e9576197e17d1"
     },
     {
       "difficulty": "medium",
@@ -62,18 +32,8 @@
     },
     {
       "difficulty": "hard",
-      "path": "pipes/pipes-5x5-hard-seed-301.json",
-      "sha256": "f7bb77bccdd6244b606048f22209e145e791a42da6180bd575b013b1fdd90207"
-    },
-    {
-      "difficulty": "hard",
       "path": "futoshiki/futoshiki-6x6-hard-seed-401.json",
       "sha256": "f9208b5e308031f838cd48a92105ea10595a329939c1151dfeea91f311b14573"
-    },
-    {
-      "difficulty": "hard",
-      "path": "pipes/pipes-5x5-hard-seed-302.json",
-      "sha256": "fac7f1e74024a43744c99a6bc6a1364afe8055e7656a1f1cf72a7f4209436d19"
     },
     {
       "difficulty": "hard",
@@ -82,13 +42,53 @@
     },
     {
       "difficulty": "hard",
-      "path": "pipes/pipes-5x5-hard-seed-303.json",
-      "sha256": "3ddfda8ce78b2ea86df4b19ce9a0d3d32ee401c24c5924abbf4114d8faef2abf"
+      "path": "futoshiki/futoshiki-6x6-hard-seed-403.json",
+      "sha256": "fbcf0bcb9bbd9f0608ff507e8984c945cefa598b08e782e3efb9725112832cb3"
     },
     {
       "difficulty": "hard",
-      "path": "futoshiki/futoshiki-6x6-hard-seed-403.json",
-      "sha256": "fbcf0bcb9bbd9f0608ff507e8984c945cefa598b08e782e3efb9725112832cb3"
+      "path": "pipes/pipes-6x6-hard-wrap-seed-601.json",
+      "sha256": "2dcd3ff940cfdb44aef446b9033d5477f789598618c6b66aace7c3f547d9d28a"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-6x6-hard-wrap-seed-602.json",
+      "sha256": "ce54568e46b494f8d23b68f4285a90136e297c2e16f25d2f00f6a7e6c9b99f05"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-6x6-hard-wrap-seed-603.json",
+      "sha256": "794fbb3b8c9b9a22eaeaa470834ffc7f181d095147514e8a6d32dfc6e9c9e9dc"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-7x7-hard-wrap-seed-701.json",
+      "sha256": "aec4d2449c181b90f95036e4888e7f4c8a91026071b05c827498803346b7a45c"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-7x7-hard-wrap-seed-702.json",
+      "sha256": "97fbe54417952c62a978d9f0ae10e174f5ce61851b47fb45d81d54efb91c8433"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-7x7-hard-wrap-seed-703.json",
+      "sha256": "6871996bf7c5f45ff8b4863d693638ee65d5ee4f64a22cf49923b1657c193151"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-8x8-hard-wrap-seed-801.json",
+      "sha256": "d17cb3b408ad6f9d4b00d977037d416f5ea847c582d3a520cbd370155047b1ed"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-8x8-hard-wrap-seed-802.json",
+      "sha256": "d3ff6fd7bb550dc90552f0baf944bf62742eef9d1b29d997d6afb22dd0841d47"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-8x8-hard-wrap-seed-803.json",
+      "sha256": "5aeda321cb01f44373d90b03844c8365ce518bcd047c67b0937c127eb3e6a028"
     }
   ],
   "schema_version": 1
