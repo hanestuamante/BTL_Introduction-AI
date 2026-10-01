@@ -3,6 +3,10 @@ from __future__ import annotations
 import random
 from typing import Any
 
+from logic_search.core.cancellation import CancellationToken
+from logic_search.core.events import EventType
+from logic_search.search.solver import solve
+
 from .model import BASE_MASKS, DIRECTIONS, PipesProblem, orientations, rotate_mask
 
 MASK_TO_TILE = {1: "END", 2: "END", 4: "END", 8: "END", 5: "STRAIGHT", 10: "STRAIGHT", 3: "CORNER", 6: "CORNER", 12: "CORNER", 9: "CORNER", 7: "TEE", 14: "TEE", 13: "TEE", 11: "TEE", 15: "CROSS"}
@@ -24,7 +28,6 @@ def _solutions(problem: PipesProblem, limit: int = 2, *, node_limit: int | None 
             if problem.is_goal(state):
                 solutions.append(state)
             return
-        # MRV makes uniqueness checks practical on wrapped grids with fewer border clues.
         index = min(empty, key=lambda i: (len(problem.domain(state, i)), i))
         for mask in problem.domain(state, index):
             child = problem.result(state, (index, mask))
@@ -48,7 +51,6 @@ def _neighbor(index, direction, rows, cols, wrap):
 
 
 def _tree_masks(rows: int, cols: int, rng: random.Random, *, wrap: bool = False) -> list[int]:
-    # Randomized Kruskal produces branching trees, rather than predominantly long DFS paths.
     edges = []
     for index in range(rows * cols):
         row, col = divmod(index, cols)
@@ -59,7 +61,6 @@ def _tree_masks(rows: int, cols: int, rng: random.Random, *, wrap: bool = False)
                 edges.append((index, neighbor, direction[2], direction[3], seam))
     rng.shuffle(edges)
     if wrap:
-        # Force a seam edge so wrap-around is part of the solution, not just metadata.
         seam = next(edge for edge in edges if edge[4])
         edges.remove(seam)
         edges.insert(0, seam)
@@ -85,18 +86,34 @@ def _rotation_for_mask(tile: str, mask: int) -> int:
     return next(turns for turns in range(4) if rotate_mask(BASE_MASKS[tile], turns) == mask)
 
 
+def _search_effort(problem: PipesProblem, algorithm: str, budget: int) -> dict[str, Any]:
+    token = CancellationToken()
+
+    def observe(event):
+        if event.type == EventType.NODE_EXPANDED and event.nodes_expanded >= budget:
+            token.cancel()
+
+    result = solve(problem, algorithm, timeout=None, cancellation=token, on_event=observe)
+    return {
+        "status": result.status,
+        "nodes_expanded": result.metrics.nodes_expanded,
+        "nodes_pruned": result.metrics.nodes_pruned,
+        "max_frontier_size": result.metrics.max_frontier_size,
+        "solution_depth": result.metrics.solution_depth,
+    }
+
+
 def generate_pipes(
     rows: int,
     cols: int,
     seed: int,
     *,
-    difficulty: str = "easy",
+    difficulty: str = "hard",
     wrap: bool = False,
     lock_ratio: float = 0.0,
-    candidates: int = 8,
+    candidates: int = 24,
     node_limit: int = 20000,
 ) -> dict[str, Any]:
-    """Select a deterministic candidate; lock_ratio is a minimum, including uniqueness clues."""
     if rows < 2 or cols < 2:
         raise ValueError("rows and cols must be >= 2")
     if wrap and (rows == 2 or cols == 2):
@@ -122,7 +139,6 @@ def generate_pipes(
             try:
                 solutions, effort = _solutions(problem, node_limit=node_limit)
             except ValueError:
-                # More clues bound the cost without accepting an unchecked puzzle.
                 unlocked = [i for i in range(size) if i not in locked]
                 locked.add(rng.choice(unlocked))
                 continue
@@ -131,23 +147,24 @@ def generate_pipes(
             alternate = next(state for state in solutions if state != tuple(masks))
             choices = [i for i in range(size) if alternate[i] != masks[i] and i not in locked]
             locked.add(rng.choice(choices))
-        for i in locked:
-            rotations[i] = _rotation_for_mask(tiles[i], masks[i])
+        scramble_ratio = {"easy": 0.45, "medium": 0.7, "hard": 1.0}[difficulty]
+        movable = [i for i in range(size) if i not in locked and len(orientations(tiles[i])) > 1]
+        scrambled = set(rng.sample(movable, round(len(movable) * scramble_ratio)))
+        for i in range(size):
+            target = rng.choice([mask for mask in orientations(tiles[i]) if mask != masks[i]]) if i in scrambled else masks[i]
+            rotations[i] = _rotation_for_mask(tiles[i], target)
+        problem = PipesProblem("candidate", rows, cols, tiles, tuple(rotations), wrap=wrap,
+                               locked_mask=tuple(masks[i] if i in locked else 0 for i in range(size)))
         ambiguity = sum(max(0, len(problem.domain(problem.initial_state, i)) - 1)
                         for i in range(size) if i not in locked)
-        # A reproducible relative score; it is not a guarantee of runtime or human difficulty.
-        score = effort + 5 * ambiguity + (size - len(locked))
-        pool.append((score, candidate, masks, tiles, rotations, locked, requested, effort, ambiguity))
+        search_budget = min(node_limit, 2000)
+        solver_effort = {algorithm: _search_effort(problem, algorithm, search_budget) for algorithm in ("dfs", "gbfs")}
+        expanded = [metrics["nodes_expanded"] for metrics in solver_effort.values()]
+        score = min(expanded) + sum(expanded) / 10
+        pool.append((score, candidate, masks, tiles, rotations, locked, requested, effort, ambiguity, scrambled, solver_effort))
     pool.sort(key=lambda item: (item[0], item[1]))
     rank = {"easy": 0, "medium": len(pool) // 2, "hard": len(pool) - 1}[difficulty]
-    score, _, masks, tiles, rotations, locked, requested, effort, ambiguity = pool[rank]
-    # Scramble distinct orientations (straight/cross tiles have rotational symmetry).
-    scramble_ratio = {"easy": 0.45, "medium": 0.7, "hard": 1.0}[difficulty]
-    movable = [i for i in range(size) if i not in locked and len(orientations(tiles[i])) > 1]
-    scrambled = set(rng.sample(movable, round(len(movable) * scramble_ratio)))
-    for i in range(size):
-        target = rng.choice([mask for mask in orientations(tiles[i]) if mask != masks[i]]) if i in scrambled else masks[i]
-        rotations[i] = _rotation_for_mask(tiles[i], target)
+    score, _, masks, tiles, rotations, locked, requested, effort, ambiguity, scrambled, solver_effort = pool[rank]
     variant = ("-wrap" if wrap else "") + (f"-locks-{lock_ratio:g}" if lock_ratio else "")
     result: dict[str, Any] = {
         "schema_version": 1,
@@ -157,8 +174,10 @@ def generate_pipes(
         "tiles": [list(tiles[r * cols:(r + 1) * cols]) for r in range(rows)],
         "initial_rotations": [rotations[r * cols:(r + 1) * cols] for r in range(rows)],
         "metadata": {
-            "generator": "kruskal-ranked-unique-v2", "seed": seed, "difficulty": difficulty,
+            "generator": "kruskal-solver-ranked-unique-v3", "seed": seed, "difficulty": difficulty,
             "candidates": candidates, "node_limit": node_limit, "difficulty_score": score,
+            "solver_effort": solver_effort, "solver_node_budget": search_budget,
+            "difficulty_method": "min_expanded_plus_total_expanded_div_10",
             "uniqueness_nodes": effort, "initial_ambiguity": ambiguity,
             "scrambled_cells": len(scrambled), "scramble_ratio": scramble_ratio,
             "requested_lock_ratio": lock_ratio, "requested_locked_count": requested,

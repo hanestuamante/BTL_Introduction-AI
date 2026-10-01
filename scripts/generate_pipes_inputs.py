@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -23,14 +22,14 @@ def write_stable(path: Path, data: dict) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate reproducible, uniquely solvable Pipes inputs.")
     parser.add_argument("--output", type=Path, default=ROOT / "data" / "generated-pipes", help="Output directory (default: repository data/generated-pipes/).")
-    parser.add_argument("--difficulty", nargs="+", choices=("easy", "medium", "hard"), default=["easy", "medium", "hard"], help="Levels to generate (default: all three).")
+    parser.add_argument("--difficulty", nargs="+", choices=("easy", "medium", "hard"), default=["hard"], help="Levels to generate (default: hard).")
     parser.add_argument("--count", type=int, default=3, help="Pipes inputs per difficulty (default: 3).")
     parser.add_argument("--seed", type=int, help="Base seed; add 0/100/200 for Easy/Medium/Hard (default: 101).")
-    parser.add_argument("--rows", type=int, help="Override Pipes rows (default: 3/4/5 by difficulty).")
-    parser.add_argument("--cols", type=int, help="Override Pipes columns (default: 3/4/5 by difficulty).")
+    parser.add_argument("--rows", type=int, default=6, help="Pipes rows (default: 6).")
+    parser.add_argument("--cols", type=int, default=6, help="Pipes columns (default: 6).")
     parser.add_argument("--wrap", action="store_true", help="Generate Pipes with wrap-around; both dimensions must be >= 3.")
     parser.add_argument("--lock-ratio", type=float, default=0.0, metavar="0..1", help="Minimum fraction of Pipes cells locked to solution orientations; additional locks may ensure uniqueness (default: 0).")
-    parser.add_argument("--candidates", type=int, default=8, help="Pipes candidates ranked for each input (default: 8).")
+    parser.add_argument("--candidates", type=int, default=24, help="Pipes candidates ranked by solver effort for each input (default: 24).")
     parser.add_argument("--node-limit", type=int, default=20000, help="Pipes uniqueness-search node budget per attempt; add locks when exceeded (default: 20000).")
     parser.add_argument("--overwrite", action="store_true", help="Allow replacing existing generated files and benchmark_manifest.json.")
     return parser
@@ -68,7 +67,6 @@ def main(argv: list[str] | None = None) -> int:
     existing = [str(path) for path in targets if path.exists()]
     if existing and not args.overwrite:
         parser.error("Existing output files: " + ", ".join(existing[:4]) + ". Use another --output directory or --overwrite.")
-    # Generate everything before writing, so validation failures do not replace part of a dataset.
     generated = []
     for relative, positional, difficulty in plans:
         try:
