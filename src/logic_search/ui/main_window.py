@@ -10,7 +10,7 @@ from logic_search.search.solver import solve
 
 from .controller import SearchController
 from .futoshiki_canvas import FutoshikiCanvas
-from .game_logic import futoshiki_conflicts, initial_play_state, pipes_conflicts, rotate_pipe, set_futoshiki_value
+from .game_logic import futoshiki_conflicts, initial_play_state, pipes_conflicts, pipes_water, rotate_pipe, set_futoshiki_value
 from .metrics_panel import MetricsPanel
 from .pipes_canvas import PipesCanvas
 
@@ -112,8 +112,9 @@ class MainWindow:
             self.status.set(f"Futoshiki {self.problem.size}×{self.problem.size}: chọn ô trắng để bắt đầu.")
         else:
             self._build_number_pad(0)
-            self.help_label.configure(text="• Bấm trái để xoay 90°\n• Bấm phải để xoay ngược\n• Mọi đầu ống phải khớp\n• Mạng ống là một cây liên thông")
-            self.status.set(f"Pipes {self.problem.rows}×{self.problem.cols}: bấm vào ô để xoay ống.")
+            self.help_label.configure(text="• Bấm trái để xoay 90°\n• Bấm phải để xoay ngược\n• Mọi đầu ống phải khớp\n• Mạng ống là một cây liên thông\n• Viền cam đứt nét: ô khóa\n• Vòng tròn đỏ: nguồn nước\n• Ống xanh dương: có nước")
+            wrap_note = " — nối biên (viền tím đứt nét)" if self.problem.wrap else ""
+            self.status.set(f"Pipes {self.problem.rows}×{self.problem.cols}{wrap_note}: bấm vào ô để xoay ống.")
         self._draw()
 
     def _build_number_pad(self, size: int) -> None:
@@ -135,7 +136,12 @@ class MainWindow:
         self.canvas.bind("<Button-3>", lambda event: self._on_click(event, reverse=True))
 
     def _draw(self) -> None:
-        if self.problem is not None and self.current_state is not None and hasattr(self.canvas, "draw"):
+        if self.problem is None or self.current_state is None or not hasattr(self.canvas, "draw"):
+            return
+        if isinstance(self.canvas, PipesCanvas):
+            water = pipes_water(self.problem, self.current_state)
+            self.canvas.draw(self.problem, self.current_state, solved=self.solved, selected=self.selected, conflicts=self.conflicts, water=water)
+        else:
             self.canvas.draw(self.problem, self.current_state, solved=self.solved, selected=self.selected, conflicts=self.conflicts)
 
     def _remember(self, new_state: tuple[int, ...]) -> None:
@@ -161,6 +167,10 @@ class MainWindow:
                 self.status.set(f"Ô hàng {index // self.problem.size + 1}, cột {index % self.problem.size + 1}: nhập số 1–{self.problem.size}.")
                 self._draw()
         else:
+            if self.problem.is_locked(index):
+                self.status.set("Ô này đã khóa, không thể xoay.")
+                self._draw()
+                return
             self._remember(rotate_pipe(self.problem, self.current_state, index, -1 if reverse else 1))
             self.status.set("Đã xoay ống. Nhấn ‘Kiểm tra’ khi mạng đã nối hoàn chỉnh.")
 

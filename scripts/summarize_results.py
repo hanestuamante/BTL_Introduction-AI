@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -14,21 +13,25 @@ NUMERIC = ("runtime_ms", "peak_python_memory_kib", "nodes_expanded")
 def summarize(input_path: Path) -> list[dict[str, str]]:
     with input_path.open(encoding="utf-8", newline="") as handle:
         raw = list(csv.DictReader(handle))
-    groups: dict[tuple[str, str, str], list[dict[str, str]]] = defaultdict(list)
+    groups: dict[tuple[str, str, str, str], list[dict[str, str]]] = defaultdict(list)
     for row in raw:
-        groups[(row["puzzle"], row["difficulty"], row["algorithm"])].append(row)
+        groups[(row["puzzle"], row["size"], row["difficulty"], row["algorithm"])].append(row)
     output = []
-    for (puzzle, difficulty, algorithm), rows in sorted(groups.items()):
+    for (puzzle, size, difficulty, algorithm), rows in sorted(groups.items()):
         solved = [row for row in rows if row["status"] == "solved"]
         record = {
             "puzzle": puzzle,
+            "size": size,
             "difficulty": difficulty,
             "algorithm": algorithm,
             "runs": str(len(rows)),
             "success_rate": f"{len(solved) / len(rows):.4f}",
         }
+        memory_rows = {row["puzzle_id"]: row for row in rows if row.get("memory_status", row["status"]) == "solved"}
+        record["memory_samples"] = str(sum(row.get("peak_python_memory_kib") not in {None, "", "None"} for row in memory_rows.values()))
         for field in NUMERIC:
-            values = [float(row[field]) for row in solved if row.get(field) not in {None, "", "None"}]
+            samples = memory_rows.values() if field == "peak_python_memory_kib" else solved
+            values = [float(row[field]) for row in samples if row.get(field) not in {None, "", "None"}]
             record[f"{field}_median"] = f"{statistics.median(values):.4f}" if values else ""
             record[f"{field}_mean"] = f"{statistics.fmean(values):.4f}" if values else ""
             record[f"{field}_stdev"] = f"{statistics.stdev(values):.4f}" if len(values) > 1 else "0.0000"
@@ -41,29 +44,30 @@ def summarize(input_path: Path) -> list[dict[str, str]]:
 def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]) if rows else [])
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]) if rows else [], lineterminator="\n")
         if rows:
             writer.writeheader()
             writer.writerows(rows)
 
 
 def write_svg(path: Path, rows: list[dict[str, str]], metric: str, title: str) -> None:
-    values = [float(row.get(metric) or 0) for row in rows]
+    values = [float(row[metric]) if row.get(metric) else None for row in rows]
     width, height, margin = 1000, 520, 70
     chart_h = height - 2 * margin
-    max_value = max(values, default=1) or 1
+    max_value = max((value for value in values if value is not None), default=1) or 1
     bar_w = (width - 2 * margin) / max(1, len(rows))
     pieces = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">', '<rect width="100%" height="100%" fill="white"/>', f'<text x="{width/2}" y="30" text-anchor="middle" font-family="sans-serif" font-size="20">{title}</text>']
     pieces.append(f'<line x1="{margin}" y1="{height-margin}" x2="{width-margin}" y2="{height-margin}" stroke="#334155"/>')
     for i, (row, value) in enumerate(zip(rows, values)):
         x = margin + i * bar_w + bar_w * .15
-        h = chart_h * value / max_value
+        h = chart_h * (value or 0) / max_value
         y = height - margin - h
         color = "#2563eb" if row["algorithm"] == "dfs" else "#f59e0b"
-        label = f'{row["puzzle"][:1].upper()}-{row["difficulty"][:1].upper()}-{row["algorithm"].upper()}'
+        label = f"{row['puzzle'][:1].upper()}-{row['size']}-{row['difficulty'][:1].upper()}-{row['algorithm'].upper()}"
         pieces.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w*.7:.1f}" height="{h:.1f}" fill="{color}"/>')
         pieces.append(f'<text x="{x+bar_w*.35:.1f}" y="{height-margin+18}" text-anchor="middle" font-family="sans-serif" font-size="10">{label}</text>')
-        pieces.append(f'<text x="{x+bar_w*.35:.1f}" y="{max(48,y-5):.1f}" text-anchor="middle" font-family="sans-serif" font-size="10">{value:.2f}</text>')
+        value_label = f"{value:.2f}" if value is not None else "N/A"
+        pieces.append(f'<text x="{x+bar_w*.35:.1f}" y="{max(48,y-5):.1f}" text-anchor="middle" font-family="sans-serif" font-size="10">{value_label}</text>')
     pieces.append('</svg>')
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(pieces), encoding="utf-8")

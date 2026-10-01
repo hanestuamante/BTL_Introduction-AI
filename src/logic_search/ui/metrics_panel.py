@@ -3,24 +3,47 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
+from logic_search.core.events import EventType
+
 
 class MetricsPanel(ttk.LabelFrame):
-    FIELDS = ("status", "elapsed", "generated", "expanded", "pruned", "frontier", "depth", "heuristic")
+    FIELDS = ("status", "transition", "elapsed", "generated", "expanded", "pruned", "frontier", "depth", "heuristic")
 
     def __init__(self, master) -> None:
         super().__init__(master, text="Search metrics", padding=8)
         self.variables = {name: tk.StringVar(value="-") for name in self.FIELDS}
+        self._previous_node_id = None
         for row, name in enumerate(self.FIELDS):
-            ttk.Label(self, text=name.replace("_", " ").title() + ":").grid(row=row, column=0, sticky="w", padx=(0, 8))
-            ttk.Label(self, textvariable=self.variables[name], width=16).grid(row=row, column=1, sticky="w")
+            label = "No new children" if name == "pruned" else name.replace("_", " ").title()
+            ttk.Label(self, text=label + ":").grid(row=row, column=0, sticky="w", padx=(0, 8))
+            ttk.Label(self, textvariable=self.variables[name], width=24, wraplength=190).grid(row=row, column=1, sticky="w")
 
     def update_event(self, event) -> None:
-        self.variables["status"].set(event.type.value)
+        labels = {
+            EventType.STARTED: "Đang tìm kiếm",
+            EventType.NODE_GENERATED: "Đã tạo node chờ xét",
+            EventType.NODE_EXPANDED: "Đang mở rộng node",
+            EventType.NODE_PRUNED: "Không sinh child mới",
+            EventType.GOAL_FOUND: "Đã tìm thấy nghiệm",
+            EventType.FINISHED: f"Kết thúc: {event.message}",
+            EventType.ERROR: "Lỗi tìm kiếm",
+        }
+        self.variables["status"].set(labels[event.type])
         self.variables["elapsed"].set(f"{event.elapsed_ms:.1f} ms")
-        self.variables["generated"].set(str(event.nodes_generated))
-        self.variables["expanded"].set(str(event.nodes_expanded))
-        self.variables["pruned"].set(str(event.nodes_pruned))
-        self.variables["frontier"].set(str(event.frontier_size))
-        self.variables["depth"].set(str(event.depth))
-        self.variables["heuristic"].set(f"{event.h:g}")
-
+        if event.type == EventType.STARTED:
+            self._previous_node_id = None
+            for name in self.FIELDS[3:]:
+                self.variables[name].set("0")
+            self.variables["transition"].set("Node gốc")
+        if event.type == EventType.NODE_EXPANDED:
+            switched = self._previous_node_id is not None and event.parent_id != self._previous_node_id
+            self.variables["transition"].set("Chuyển nhánh xét" if switched else "Tiếp tục mở rộng")
+            self._previous_node_id = event.node_id
+        if event.type == EventType.NODE_PRUNED:
+            self.variables["transition"].set("Ngõ cụt" if event.message == "No valid actions" else "Child đã được khám phá")
+        if event.type in {EventType.STARTED, EventType.NODE_EXPANDED, EventType.NODE_PRUNED, EventType.FINISHED}:
+            for field, value in (("generated", event.nodes_generated), ("expanded", event.nodes_expanded), ("pruned", event.nodes_pruned), ("frontier", event.frontier_size)):
+                self.variables[field].set(str(value))
+        if event.type in {EventType.STARTED, EventType.NODE_EXPANDED, EventType.NODE_PRUNED, EventType.GOAL_FOUND}:
+            self.variables["depth"].set(str(event.depth))
+            self.variables["heuristic"].set(f"{event.h:g}")

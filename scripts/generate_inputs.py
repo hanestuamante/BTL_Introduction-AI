@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -24,30 +23,37 @@ def write_stable(path: Path, data: dict) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=ROOT / "data")
+    parser.add_argument("--pipes-only", action="store_true")
     args = parser.parse_args()
-    specs = {
-        "easy": ((3, 3), 4),
-        "medium": ((4, 4), 5),
-        "hard": ((5, 5), 6),
-    }
-    manifest = {"schema_version": 1, "inputs": []}
-    for level_index, (difficulty, (pipe_size, futo_size)) in enumerate(specs.items()):
+    manifest_path = args.output / "benchmark_manifest.json"
+    previous = json.loads(manifest_path.read_text()) if manifest_path.exists() else {"inputs": []}
+    retained = [entry for entry in previous["inputs"] if entry["path"].startswith("futoshiki/")] if args.pipes_only else []
+    generated = []
+    for size in (6, 7, 8):
         for offset in range(3):
-            pipe_seed = 101 + level_index * 100 + offset
-            futo_seed = 201 + level_index * 100 + offset
-            datasets = (
-                ("pipes", generate_pipes(*pipe_size, pipe_seed, difficulty=difficulty)),
-                ("futoshiki", generate_futoshiki(futo_size, futo_seed, difficulty=difficulty)),
-            )
-            for folder, data in datasets:
-                relative = Path(folder) / f"{data['id']}.json"
-                checksum = write_stable(args.output / relative, data)
-                manifest["inputs"].append({"path": str(relative), "difficulty": difficulty, "sha256": checksum})
-    write_stable(args.output / "benchmark_manifest.json", manifest)
-    print(f"Generated {len(manifest['inputs'])} inputs in {args.output}")
+            seed = size * 100 + 1 + offset
+            data = generate_pipes(size, size, seed, difficulty="hard", wrap=True, candidates=24)
+            relative = Path("pipes") / f"{data['id']}.json"
+            generated.append((relative, "hard", data))
+            print(f"Generated {data['id']}: {data['metadata']['solver_effort']}", flush=True)
+    if not args.pipes_only:
+        for level, difficulty in enumerate(("easy", "medium", "hard")):
+            for offset in range(3):
+                data = generate_futoshiki(4 + level, 201 + level * 100 + offset, difficulty=difficulty)
+                generated.append((Path("futoshiki") / f"{data['id']}.json", difficulty, data))
+    manifest = {"schema_version": 1, "inputs": retained}
+    for relative, difficulty, data in generated:
+        checksum = write_stable(args.output / relative, data)
+        manifest["inputs"].append({"path": relative.as_posix(), "difficulty": difficulty, "sha256": checksum})
+    write_stable(manifest_path, manifest)
+    active = {entry["path"] for entry in manifest["inputs"]}
+    for entry in previous["inputs"]:
+        relative = Path(entry["path"])
+        if relative.parts[0] == "pipes" and not relative.is_absolute() and ".." not in relative.parts and entry["path"] not in active:
+            (args.output / relative).unlink(missing_ok=True)
+    print(f"Wrote {len(manifest['inputs'])} inputs in {args.output}")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

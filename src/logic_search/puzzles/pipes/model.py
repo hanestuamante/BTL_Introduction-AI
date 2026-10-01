@@ -31,18 +31,36 @@ class PipesProblem:
     tiles: tuple[str, ...]
     initial_rotations: tuple[int, ...]
     metadata: dict | None = None
+    wrap: bool = False
+    locked_mask: tuple[int, ...] | None = None
+    source: int | None = None
+
+    @property
+    def source_index(self) -> int:
+        if self.source is not None:
+            return self.source
+        return (self.rows // 2) * self.cols + (self.cols // 2)
 
     @property
     def initial_state(self) -> PipesState:
-        return (0,) * (self.rows * self.cols)
+        if self.locked_mask is None:
+            return (0,) * (self.rows * self.cols)
+        return self.locked_mask
 
     def state_key(self, state: PipesState) -> PipesState:
         return state
+
+    def is_locked(self, index: int) -> bool:
+        return self.locked_mask is not None and self.locked_mask[index] != 0
 
     def neighbor(self, index: int, direction: tuple[int, int, int, int]) -> int | None:
         row, col = divmod(index, self.cols)
         dr, dc, _bit, _opposite = direction
         nr, nc = row + dr, col + dc
+        if self.wrap:
+            nr %= self.rows
+            nc %= self.cols
+            return nr * self.cols + nc
         return nr * self.cols + nc if 0 <= nr < self.rows and 0 <= nc < self.cols else None
 
     def _locally_valid(self, state: PipesState, index: int, mask: int) -> bool:
@@ -82,15 +100,21 @@ class PipesProblem:
             parent[ra] = rb
             return True
 
+        seen_edges: set[frozenset[int]] = set()
         for index, mask in enumerate(state):
             if not mask:
                 continue
-            for direction in (DIRECTIONS[1], DIRECTIONS[2]):
+            for direction in DIRECTIONS:
                 neighbor = self.neighbor(index, direction)
                 bit, opposite = direction[2], direction[3]
-                if neighbor is not None and state[neighbor] and mask & bit and state[neighbor] & opposite:
-                    if not union(index, neighbor):
-                        return True
+                if neighbor is None or not (mask & bit) or not state[neighbor] or not (state[neighbor] & opposite):
+                    continue
+                edge = frozenset((index, neighbor))
+                if edge in seen_edges:
+                    continue
+                seen_edges.add(edge)
+                if not union(index, neighbor):
+                    return True
         return False
 
     def is_consistent(self, state: PipesState) -> bool:
@@ -98,6 +122,8 @@ class PipesProblem:
             return False
         for index, mask in enumerate(state):
             if mask and (mask not in orientations(self.tiles[index]) or not self._locally_valid(state, index, mask)):
+                return False
+            if self.is_locked(index) and mask != self.locked_mask[index]:
                 return False
         if self._has_assigned_cycle(state):
             return False
@@ -135,6 +161,8 @@ class PipesProblem:
             raise ValueError("Action targets a non-empty or invalid cell")
         if mask not in orientations(self.tiles[index]):
             raise ValueError("Mask is not an orientation of this tile")
+        if self.is_locked(index) and mask != self.locked_mask[index]:
+            raise ValueError("Action targets a locked cell with a different mask")
         values = list(state)
         values[index] = mask
         return tuple(values)
@@ -178,4 +206,3 @@ class PipesProblem:
                         assigned.remove(neighbor)
                         stack.append(neighbor)
         return 1000 * dead + 5 * max(0, components - 1) + sum(max(0, len(d) - 1) for d in domains) + len(unassigned)
-

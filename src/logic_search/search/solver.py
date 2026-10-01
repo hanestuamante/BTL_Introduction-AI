@@ -59,7 +59,7 @@ def solve(
         frontier = PriorityFrontier[int]()
         frontier.push(0, initial_h, 0)
     metrics.max_frontier_size = 1
-    emitter.emit(EventType.STARTED, state=problem.initial_state, frontier_size=1)
+    emitter.emit(EventType.STARTED, node_id=0, state=problem.initial_state, nodes_generated=1, frontier_size=1, h=initial_h)
 
     def finish(status: str, message: str = "", node_id: int | None = None) -> SearchResult:
         metrics.runtime_ms = (perf_counter() - started) * 1000
@@ -78,7 +78,7 @@ def solve(
             frontier_size=len(frontier),
             message=status,
         )
-        return SearchResult(status, path, actions, metrics, message)  # type: ignore[arg-type]
+        return SearchResult(status, path, actions, metrics, message)
 
     try:
         while len(frontier):
@@ -100,6 +100,8 @@ def solve(
             metrics.nodes_expanded += 1
             emitter.emit(
                 EventType.NODE_EXPANDED,
+                node_id=node_id,
+                parent_id=node.parent_id,
                 state_key=key,
                 state=node.state,
                 action=node.action,
@@ -111,10 +113,11 @@ def solve(
                 frontier_size=len(frontier),
             )
             if problem.is_goal(node.state):
-                emitter.emit(EventType.GOAL_FOUND, state_key=key, state=node.state, depth=node.depth, h=node.h)
+                emitter.emit(EventType.GOAL_FOUND, node_id=node_id, parent_id=node.parent_id, state_key=key, state=node.state, depth=node.depth, h=node.h)
                 return finish("solved", node_id=node_id)
             child_ids: list[int] = []
-            for action in problem.actions(node.state):
+            valid_actions = list(problem.actions(node.state))
+            for action in valid_actions:
                 child_state = problem.result(node.state, action)
                 child_key = problem.state_key(child_state)
                 if child_key in visited or child_key in frontier_keys:
@@ -127,11 +130,13 @@ def solve(
                 frontier_keys.add(child_key)
                 child_ids.append(child_id)
                 metrics.nodes_generated += 1
-                emitter.emit(EventType.NODE_GENERATED, state_key=child_key, state=child_state, action=action, depth=node.depth + 1, h=h)
+                emitter.emit(EventType.NODE_GENERATED, node_id=child_id, parent_id=node_id, state_key=child_key, state=child_state, action=action, depth=node.depth + 1, h=h)
             if not child_ids:
                 metrics.nodes_pruned += 1
                 emitter.emit(
                     EventType.NODE_PRUNED,
+                    node_id=node_id,
+                    parent_id=node.parent_id,
                     state_key=key,
                     state=node.state,
                     depth=node.depth,
@@ -140,7 +145,7 @@ def solve(
                     nodes_expanded=metrics.nodes_expanded,
                     nodes_pruned=metrics.nodes_pruned,
                     frontier_size=len(frontier),
-                    message="No valid children",
+                    message="All children already discovered" if valid_actions else "No valid actions",
                 )
             if algorithm == "dfs":
                 for child_id in reversed(child_ids):
