@@ -15,9 +15,9 @@ from .metrics import environment_metadata
 
 def _worker(path: str, algorithm: str, timeout: float, measure_memory: bool, output: mp.Queue) -> None:
     try:
+        problem = load_problem(path)
         if measure_memory:
             tracemalloc.start()
-        problem = load_problem(path)
         result = solve(problem, algorithm, timeout=timeout, detailed_events=False)
         peak = None
         if measure_memory:
@@ -56,7 +56,6 @@ def run_benchmark(
         path = entry["path"]
         problem = load_problem(path)
         for algorithm in algorithms:
-            # One unrecorded warm-up in its own process.
             run_isolated(path, algorithm, timeout)
             memory = run_isolated(path, algorithm, timeout, measure_memory=True)
             for repeat in range(repeats):
@@ -73,6 +72,9 @@ def run_benchmark(
                     **environment,
                     **timing,
                 }
-                record["peak_python_memory_kib"] = memory.get("peak_python_memory_kib")
+                record["memory_status"] = memory.get("status", "error")
+                record["memory_message"] = memory.get("message", "")
+                record["memory_scope"] = "search_python_allocations"
+                record["peak_python_memory_kib"] = memory.get("peak_python_memory_kib") if memory.get("status") == "solved" else None
                 records.append(record)
     return records
