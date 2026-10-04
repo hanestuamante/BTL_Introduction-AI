@@ -27,9 +27,15 @@ class MetricsPanel(ttk.LabelFrame):
             EventType.GOAL_FOUND: "Đã tìm thấy nghiệm",
             EventType.FINISHED: f"Kết thúc: {event.message}",
             EventType.ERROR: "Lỗi tìm kiếm",
+            EventType.CELL_DOMAIN: "Đang xét miền giá trị",
+            EventType.VALUE_TRIED: "Đang thử giá trị",
+            EventType.VALUE_REJECTED: "Đã loại giá trị",
+            EventType.BACKTRACK: "Đang quay lui",
         }
         self.variables["status"].set(labels[event.type])
-        self.variables["elapsed"].set(f"{event.elapsed_ms:.1f} ms")
+        elapsed = (f"{event.elapsed_ms / 1000.0:.2f} s" if event.elapsed_ms >= 1000.0
+                   else f"{event.elapsed_ms:.2f} ms")
+        self.variables["elapsed"].set(elapsed)
         if event.type == EventType.STARTED:
             self._previous_node_id = None
             for name in self.FIELDS[3:]:
