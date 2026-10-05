@@ -84,8 +84,6 @@ def solve(
         return SearchResult(status, path, actions, metrics, message)
 
     visual_events = detailed_events and on_event is not None
-    # Only DFS exhausts subtrees before moving to the next sibling.
-    # Domain backtracking applies to assignment puzzles, not Pipes rotations.
     assignment_problem = hasattr(problem, "size") and hasattr(problem, "domain")
     domain_backtracking = visual_events and algorithm == "dfs" and assignment_problem
     last_expanded_id: int | None = None

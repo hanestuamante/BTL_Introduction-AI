@@ -71,7 +71,7 @@ class FutoshikiCanvas(tk.Canvas):
                 badge_h = min(20.0, max(13.0, cell * 0.22))
                 by0 = y0 + 3.0
                 by1 = by0 + badge_h
-                num_items = len(domain_values)  # type: ignore[arg-type]
+                num_items = len(domain_values)
                 avail_w = cell - 8.0
                 gap = 2.0 if num_items > 1 else 0.0
                 item_w = min(20.0, max(12.0, (avail_w - (num_items - 1) * gap) / max(1, num_items)))
@@ -79,7 +79,7 @@ class FutoshikiCanvas(tk.Canvas):
                 bx_start = (x0 + x1 - row_w) / 2.0
                 rejected_set = rejected_values or set()
 
-                for idx, v in enumerate(domain_values):  # type: ignore[union-attr]
+                for idx, v in enumerate(domain_values):
                     bx0 = bx_start + idx * (item_w + gap)
                     bx1 = bx0 + item_w
                     if v in rejected_set:

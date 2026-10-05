@@ -72,11 +72,6 @@ def test_pruning_duplicate_children_has_a_distinct_reason():
 
 
 def test_dfs_emits_intermediate_backtrack_unwind_events():
-    # Tree structure:
-    # Root (0) -> (1, 1) -> (2, 1) [dead end]
-    # Root (0) -> (1, 2) -> (2, 2) [goal]
-    # When (2, 1) dead ends, (1, 1) is a sibling of (1, 2) (both under Root for cell 1).
-    # It must unwind (1, 1) with reason="dead_end", value=1, keeping value 2 available.
     @dataclass
     class TreeProblem:
         initial_state: tuple[int, int, int] = (0, 0, 0)
@@ -88,7 +83,7 @@ def test_dfs_emits_intermediate_backtrack_unwind_events():
             if state == (0, 0, 0):
                 return [(1, 1), (1, 2)]
             elif state == (0, 1, 0):
-                return [(2, 1), ] # only choice, leading to dead end
+                return [(2, 1), ]
             elif state == (0, 2, 0):
                 return [(2, 2), ]
             return ()
@@ -104,19 +99,13 @@ def test_dfs_emits_intermediate_backtrack_unwind_events():
     result = solve(TreeProblem(), "dfs", detailed_events=True, on_event=lambda e: events.append(e))
     assert result.status == "solved"
 
-    # Check for dead_end rejection of value 1 on cell 1
     rejected_events = [e for e in events if e.type.name == "VALUE_REJECTED"]
     cell_1_rejections = [e for e in rejected_events if e.cell == 1]
     assert len(cell_1_rejections) >= 1
-    # Value 1 was rejected, but reason was dead_end (not all_failed, since value 2 was still untried)
     assert any(e.value == 1 and getattr(e, "reason", None) == "dead_end" for e in cell_1_rejections)
 
 
 def test_dfs_emits_all_failed_when_all_branches_exhausted():
-    # Tree structure:
-    # Root (0) -> (1, 1) -> (2, 1) [dead end]
-    # Root (0) -> (1, 2) -> (2, 2) [dead end]
-    # All branches under Root for cell 1 fail, so cell 1 must eventually be all_failed
     @dataclass
     class ExhaustedTreeProblem:
         initial_state: tuple[int, int, int] = (0, 0, 0)
@@ -149,10 +138,6 @@ def test_dfs_emits_all_failed_when_all_branches_exhausted():
 
 
 def test_dfs_accumulates_rejected_values_for_multi_value_domain():
-    # Domain: {1, 2, 3}.
-    # 1 is tried -> fails -> rejected {1}
-    # 2 is tried -> fails -> rejected {1, 2}
-    # 3 is tried -> goal
     @dataclass
     class MultiValueProblem:
         initial_state: tuple[int, int] = (0, 0)
@@ -184,7 +169,6 @@ def test_dfs_accumulates_rejected_values_for_multi_value_domain():
 
     result = solve(MultiValueProblem(), "dfs", detailed_events=True, on_event=handle)
     assert result.status == "solved"
-    # When value 2 failed on cell 0, both 1 and 2 were in the accumulated rejected set!
     assert history_after_second_rejection == {1, 2}
 
 
@@ -196,18 +180,15 @@ def test_controller_step_and_pause():
     controller = SearchController()
     controller.start(problem, "dfs", paused=True)
 
-    # Initial state should be running and paused
     assert controller.state.running
     assert controller.state.paused
 
-    # Step once
     controller.step()
     time.sleep(0.1)
     polled = []
     controller.poll(lambda e: polled.append(e))
     assert len(polled) >= 1
 
-    # Cancel
     controller.cancel()
     time.sleep(0.1)
     assert not controller.state.running
@@ -223,15 +204,12 @@ def test_pure_compute_time_excludes_callback_wait() -> None:
     def slow_callback(e) -> None:
         nonlocal last_event_elapsed
         last_event_elapsed = e.elapsed_ms
-        # Simulate GUI animation / wait delay
         time.sleep(0.04)
 
     start_wall = time.perf_counter()
     result = solve(problem, "dfs", on_event=slow_callback, detailed_events=True)
     wall_duration_ms = (time.perf_counter() - start_wall) * 1000
 
-    # There are multiple events, each sleeping 40ms -> wall time > 150ms
     assert wall_duration_ms >= 120.0
-    # But measured compute time (Option 1) must exclude callback wait
     assert result.metrics.runtime_ms < 50.0
     assert last_event_elapsed < 50.0

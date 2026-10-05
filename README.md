@@ -1,26 +1,83 @@
 # Logic Puzzle Search
 
-Ứng dụng Python giải **Pipes** và **Futoshiki** bằng **Depth-First Search (DFS)** và **Greedy Best-First Search (GBFS)**. Project có CLI, GUI Tkinter chạy từng bước, generator tái lập bằng seed, 18 input benchmark, đo thời gian/bộ nhớ trong process riêng và xuất CSV/JSON/SVG.
+Giải và trực quan hóa Pipes, Futoshiki bằng DFS và Greedy Best-First Search (GBFS).
 
-## Cài đặt
+## 1. Cài đặt
 
-Yêu cầu Python 3.11+ (Tkinter cần có trong bản Python nếu dùng GUI).
+Yêu cầu Python 3.11 trở lên; Python cần có Tkinter để mở GUI. Chạy các lệnh dưới đây tại thư mục gốc dự án.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ```
 
-## Chạy nhanh
+`pyproject.toml` khai báo gói, phiên bản Python, dependencies và lệnh `logic-search`. `requirements-dev.txt` cài cùng bộ dependencies phát triển qua `python -m pip install -r requirements-dev.txt`.
 
-Mở giao diện:
+## 2. Kiến trúc và cách sử dụng các file
 
-```bash
-python -m logic_search gui
-```
+Luồng CLI: `__main__.py` → `cli.py` → `io.py` → parser của puzzle → `search/solver.py` → kết quả JSON hoặc benchmark CSV/JSON. Luồng GUI: `app.py` → `ui/main_window.py` → `ui/controller.py` → solver → event → canvas và bảng số đo.
 
-Giải một input:
+Solver làm việc qua giao diện `SearchProblem`, dùng chung quy tắc sinh trạng thái và kiểm tra đích cho DFS/GBFS. DFS dùng stack; GBFS dùng hàng đợi ưu tiên theo `(heuristic, depth, sequence_id)`. GUI chạy tìm kiếm trên worker thread; benchmark chạy mỗi lượt trong process riêng.
+
+Các đường dẫn dưới đây thuộc `src/logic_search/`. Các module được gọi qua CLI/GUI hoặc import khi phát triển.
+
+| File | Chức năng / cách sử dụng |
+| --- | --- |
+| `__main__.py` | Điểm vào của `python -m logic_search`. |
+| `cli.py` | Phân tích lệnh `solve`, `benchmark`, `gui`; điểm vào của `logic-search`. |
+| `app.py` | Khởi tạo Tkinter và cửa sổ; chạy qua lệnh `gui`. |
+| `io.py` | `load_problem(path, expected_puzzle=None)` đọc JSON và chọn parser. |
+| `core/problem.py` | Protocol `SearchProblem`: state ban đầu, action, state kế tiếp, goal, heuristic và khóa state. |
+| `core/node.py` | Node tìm kiếm, liên kết cha và action để dựng đường nghiệm. |
+| `core/result.py` | `SearchResult`, `SearchMetrics`; chuyển trạng thái, đường nghiệm và số đo sang dictionary. |
+| `core/events.py` | Loại event, dữ liệu event và bộ phát event cho GUI. |
+| `core/cancellation.py` | `CancellationToken` dùng để hủy tìm kiếm. |
+| `search/solver.py` | `solve(problem, algorithm, ...)` thực hiện tìm kiếm và thu số đo. |
+| `search/frontier.py` | Stack cho DFS, priority queue cho GBFS. |
+| `search/dfs.py` | Hàm `depth_first_search(problem, **kwargs)` gọi solver với DFS. |
+| `search/gbfs.py` | Hàm `greedy_best_first_search(problem, **kwargs)` gọi solver với GBFS. |
+| `puzzles/futoshiki/model.py` | State, miền giá trị, ràng buộc hàng/cột và bất đẳng thức, action, goal, heuristic Futoshiki. |
+| `puzzles/pipes/model.py` | Bitmask hướng ống, phép xoay, nối biên, ô khóa, action, goal, heuristic Pipes. |
+| `puzzles/futoshiki/parser.py`, `puzzles/pipes/parser.py` | Parse dictionary hoặc đọc file JSON thành problem; kiểm tra cấu trúc input. |
+| `puzzles/futoshiki/rules.py`, `puzzles/pipes/rules.py` | `validate_solution(problem, state)` kiểm tra nghiệm. |
+| `puzzles/futoshiki/heuristic.py`, `puzzles/pipes/heuristic.py` | Hàm heuristic gọi tính điểm của model tương ứng. |
+| `puzzles/futoshiki/generator.py` | `generate_futoshiki(...)` sinh đề; `count_solutions(...)` đếm nghiệm. |
+| `puzzles/pipes/generator.py` | `generate_pipes(...)` sinh đề; `count_solutions(...)` đếm nghiệm. |
+| `ui/main_window.py` | Nạp đề, thao tác chơi, chọn thuật toán và điều khiển phát lại. |
+| `ui/controller.py` | Worker tìm kiếm, hàng đợi event, tạm dừng, tiếp tục, từng bước và hủy. |
+| `ui/game_logic.py` | Thao tác chơi, kiểm tra xung đột và gợi ý. |
+| `ui/futoshiki_canvas.py`, `ui/pipes_canvas.py` | Vẽ bảng puzzle và state lên Tkinter canvas. |
+| `ui/metrics_panel.py` | Hiển thị event và các số đo tìm kiếm. |
+| `benchmark/runner.py` | Chạy warm-up, lượt đo thời gian và lượt đo bộ nhớ trong process riêng. |
+| `benchmark/metrics.py` | Thu phiên bản Python, hệ điều hành, CPU và commit cho kết quả. |
+| `benchmark/export.py` | Ghi kết quả CSV/JSON. |
+| Các file `__init__.py` | Khai báo các package Python. |
+
+Các file ngoài mã nguồn:
+
+| File / nhóm file | Cách sử dụng |
+| --- | --- |
+| `scripts/generate_inputs.py` | Sinh bộ dữ liệu benchmark chính; xem mục 5. |
+| `scripts/generate_pipes_inputs.py` | Sinh bộ Pipes tùy chỉnh; xem mục 5. |
+| `scripts/run_benchmarks.py` | Chạy cấu hình benchmark mặc định; xem mục 4. |
+| `scripts/summarize_results.py` | Tổng hợp CSV và vẽ biểu đồ; xem mục 4. |
+| `scripts/validate_submission.py` | Kiểm tra manifest, checksum, ID và nghiệm duy nhất; xem mục 7. |
+| `data/benchmark_manifest.json` | Danh sách 18 đề chính, đường dẫn tương đối và checksum SHA-256; truyền vào `--manifest`. |
+| `data/futoshiki/*.json` | 9 đề Futoshiki: 4×4 Easy, 5×5 Medium, 6×6 Hard; mỗi nhóm 3 đề. Dùng với `solve --puzzle futoshiki` hoặc GUI. |
+| `data/pipes/*.json` | 9 đề Pipes Hard nối biên: 6×6, 7×7, 8×8; mỗi kích thước 3 đề. Dùng với `solve --puzzle pipes` hoặc GUI. |
+| `data/generated-pipes-wrap/benchmark_manifest.json` | Manifest bộ Pipes Hard 6×6 nối biên, tỷ lệ khóa tối thiểu 0,15; dùng với `benchmark --manifest`. |
+| `data/generated-pipes-wrap/pipes/*.json` | 3 đề với seed 242–244; dùng với CLI/GUI. |
+| `results/raw/benchmark.csv`, `results/raw/benchmark.json` | Số đo từng lượt chạy và thông tin môi trường. |
+| `results/tables/summary.csv` | Số lượt, tỷ lệ thành công, số mẫu memory, median/mean/stdev/min/max theo puzzle, kích thước, độ khó, thuật toán. |
+| `results/charts/runtime.svg`, `results/charts/memory.svg`, `results/charts/nodes.svg` | Mở bằng trình duyệt để xem biểu đồ thời gian, bộ nhớ và node mở rộng. |
+| `docs/ADR-001.md` | Tài liệu quyết định kiến trúc. |
+| `slides/README.md` | Hướng dẫn nội dung slide. |
+| `LICENSE` | Giấy phép sử dụng mã nguồn. |
+
+## 3. Giải đề và mở GUI
+
+Có thể thay `python -m logic_search` bằng `logic-search` sau khi cài đặt. Các lệnh CLI và script dùng argparse hỗ trợ `-h` / `--help`, ngoại trừ hai script chạy cấu hình cố định được ghi rõ bên dưới.
+
+### `solve`
 
 ```bash
 python -m logic_search solve \
@@ -28,133 +85,170 @@ python -m logic_search solve \
   --input data/futoshiki/futoshiki-4x4-easy-seed-201.json \
   --algorithm gbfs --timeout 60 \
   --output results/raw/example.json
+
+python -m logic_search solve \
+  --puzzle pipes --input data/pipes/pipes-6x6-hard-wrap-seed-601.json \
+  --algorithm dfs
 ```
 
-Exit code: `0` solved, `1` unsolved, `2` input error, `3` timeout, `4` internal error.
+| Flag | Giá trị / lựa chọn | Mặc định | Ý nghĩa |
+| --- | --- | --- | --- |
+| `--puzzle` | `pipes`, `futoshiki` | Bắt buộc | Loại puzzle, phải khớp file input. |
+| `--input` | Đường dẫn JSON | Bắt buộc | Đề cần giải. |
+| `--algorithm` | `dfs`, `gbfs` | `dfs` | Thuật toán tìm kiếm. |
+| `--timeout` | Số thực, đơn vị giây | `60.0` | Giới hạn thời gian tìm kiếm. |
+| `--output` | Đường dẫn JSON | Không ghi file | Lưu kết quả; kết quả luôn được in ra terminal. |
 
-Chạy benchmark đầy đủ và tổng hợp:
+JSON trả về `status`, `path`, `actions`, `metrics`, `message` cùng thông tin puzzle và thuật toán. Mã thoát: `0` giải được, `1` không có nghiệm, `2` lỗi input, `3` hết thời gian, `4` lỗi nội bộ.
+
+### `gui`
+
+```bash
+python -m logic_search gui
+```
+
+Lệnh chỉ có `-h` / `--help`, không có flag cấu hình. Khi mở, GUI nạp đề Futoshiki 4×4 Easy.
+
+| Thao tác | Cách dùng |
+| --- | --- |
+| Browse… / Load | Chọn file JSON rồi nạp đề. |
+| Chơi Futoshiki | Chọn ô trắng, nhập số `1–N`; Backspace hoặc Xóa để xóa. |
+| Chơi Pipes | Bấm trái xoay thuận 90°, bấm phải xoay ngược; ô khóa giữ nguyên hướng. |
+| Kiểm tra / Gợi ý | Kiểm tra bàn hiện tại hoặc điền/sửa một ô. |
+| Hoàn tác / Chơi lại | Quay về state trước hoặc đặt lại đề. |
+| Thuật toán | Chọn `dfs` hoặc `gbfs`; mặc định `dfs`. |
+| Chạy / Dừng / Tiếp tục | Bắt đầu, tạm dừng hoặc tiếp tục tìm kiếm. |
+| Từng bước / Hủy | Phát từng event hoặc hủy tìm kiếm. |
+| Tốc độ | Điều chỉnh tốc độ hiển thị từ `0.25` đến `4.0`. |
+
+## 4. Benchmark và tổng hợp kết quả
+
+### `benchmark`
+
+```bash
+python -m logic_search benchmark \
+  --manifest data/benchmark_manifest.json \
+  --algorithms dfs gbfs --repeats 10 --timeout 60 \
+  --csv results/raw/benchmark.csv --json results/raw/benchmark.json
+```
+
+| Flag | Giá trị / lựa chọn | Mặc định | Ý nghĩa |
+| --- | --- | --- | --- |
+| `--manifest` | Đường dẫn JSON | Bắt buộc | Danh sách input; đường dẫn input tương đối được tính từ thư mục chứa manifest. |
+| `--algorithms` | Một hoặc nhiều giá trị `dfs`, `gbfs` | `dfs gbfs` | Thuật toán cần đo. |
+| `--repeats` | Số nguyên | `10` | Số lượt timing cho mỗi cặp input/thuật toán. |
+| `--timeout` | Số thực, đơn vị giây | `60.0` | Giới hạn mỗi lượt tìm kiếm. |
+| `--csv` | Đường dẫn CSV | Bắt buộc | Lưu số đo từng lượt. |
+| `--json` | Đường dẫn JSON | Không ghi JSON | Lưu thêm cùng số đo dưới dạng JSON. |
+
+### `scripts/run_benchmarks.py`
 
 ```bash
 python scripts/run_benchmarks.py
-python scripts/summarize_results.py
 ```
 
-Benchmark warm-up một lượt, chạy 10 lượt thời gian và một lượt `tracemalloc` riêng cho từng input/algorithm. Bộ nhớ được đo sau khi nạp/validate input, chỉ tính cấp phát Python trong `solve()`. Raw data lưu `memory_status`, `memory_message` và `memory_scope`; lượt memory không giải thành công để trống giá trị bộ nhớ. Mỗi lượt nằm trong process độc lập. Raw data không gộp mất timeout; bảng tổng hợp dùng median làm số chính.
+Script không có flags; chạy đúng cấu hình `benchmark` ở ví dụ trên và ghi lại hai file kết quả tương ứng.
 
-## Điều khiển GUI
+### `scripts/summarize_results.py`
 
-- Khi mở, app tự nạp đề Futoshiki 4×4 Easy để có thể chơi ngay.
-- Futoshiki: bấm ô trắng rồi dùng phím số hoặc bàn phím số trên màn hình; Backspace/Xóa để xóa.
-- Pipes: bấm trái để xoay thuận 90°, bấm phải để xoay ngược.
-- **Kiểm tra** tô đỏ ô xung đột và xác nhận chiến thắng; **Gợi ý** điền/sửa một ô; **Hoàn tác** quay lại nước trước.
-- **Run / Pause / Resume / Step / Cancel** điều khiển worker search mà không khóa event loop.
-- **Back** xem lại state đã render; không thay đổi search đang chạy.
-- GUI ghi “Chuyển nhánh xét” khi node được chọn không phải child của node vừa mở rộng. Đây không phải bằng chứng nhánh cũ thất bại.
-- `NODE_PRUNED` là không sinh child mới: GUI tách “Ngõ cụt” (không có action hợp lệ) và “Child đã được khám phá” (child trùng). Event tạo node/goal không đặt lại bộ đếm; event kết thúc giữ depth của nghiệm.
-- Slider **Speed** điều chỉnh tốc độ tiêu thụ event.
-- Màu cam là ô chưa quyết định, xanh dương là state đang xét, xanh lá là nghiệm, xám là given.
+```bash
+python scripts/summarize_results.py
+python scripts/summarize_results.py results/raw/benchmark.csv \
+  --table results/tables/summary.csv --charts results/charts
+```
 
-## Dữ liệu
+| Đối số / flag | Giá trị | Mặc định | Ý nghĩa |
+| --- | --- | --- | --- |
+| `input` | Đường dẫn CSV, đối số vị trí tùy chọn | `results/raw/benchmark.csv` | Raw results cần tổng hợp. |
+| `--table` | Đường dẫn CSV | `results/tables/summary.csv` | Bảng thống kê đầu ra. |
+| `--charts` | Thư mục | `results/charts` | Lưu `runtime.svg`, `memory.svg`, `nodes.svg`. |
 
-`data/benchmark_manifest.json` chứa 18 input và checksum SHA-256:
+## 5. Sinh dữ liệu
 
-| Puzzle | Kích thước | Độ khó | Số đề |
-| --- | --- | --- | ---: |
-| Pipes | 6×6, 7×7, 8×8 | Tất cả Hard, nối biên | 3/kích thước |
-| Futoshiki | 4×4, 5×5, 6×6 | Easy, Medium, Hard | 3/mức |
-
-Sinh lại byte-identical dataset:
+### `scripts/generate_inputs.py`
 
 ```bash
 python scripts/generate_inputs.py
 ```
 
-Generator Futoshiki xóa given nhưng chỉ giữ thay đổi nếu còn đúng một nghiệm. Pipes v3 sinh cây khung bằng Kruskal, kiểm tra nghiệm duy nhất và chọn Hard trong 24 ứng viên theo effort thực tế của cả DFS/GBFS sau khi xáo ô. Điểm là `min(nodes_expanded) + sum(nodes_expanded)/10`; mỗi lượt chấm bị giới hạn 2.000 node, nên ứng viên chạm giới hạn chỉ có số đo cận dưới. Metadata lưu effort, ngân sách, số khóa thực tế và seed. Hard là mức tương đối trong tập ứng viên, không phải bảo đảm về thời gian chạy.
+| Flag | Giá trị | Mặc định | Ý nghĩa |
+| --- | --- | --- | --- |
+| `--output` | Thư mục | `data` tại gốc dự án | Lưu các đề và `benchmark_manifest.json`. |
+| `--pipes-only` | Bật/tắt | Tắt | Chọn chế độ sinh bộ Pipes. |
 
-Chỉ thay bộ Pipes và giữ nguyên Futoshiki:
+Cấu hình bộ chính: Pipes Hard nối biên 6×6, 7×7, 8×8 với seed 601–603, 701–703, 801–803; Futoshiki 4×4 Easy, 5×5 Medium, 6×6 Hard với seed 201–203, 301–303, 401–403. Script ghi lại các đề và manifest tại thư mục đầu ra.
+
+### `scripts/generate_pipes_inputs.py`
 
 ```bash
-python scripts/generate_inputs.py --pipes-only
+python scripts/generate_pipes_inputs.py \
+  --difficulty hard --rows 6 --cols 6 --wrap \
+  --lock-ratio 0.15 --count 3 --seed 42 \
+  --output data/generated-pipes-wrap --overwrite
 ```
 
-Bảng tổng hợp tách theo puzzle, kích thước, độ khó và thuật toán. Mỗi cặp đề/thuật toán chỉ có một lượt memory; giá trị này được lặp trên các dòng timing và không đại diện cho 10 phép đo memory độc lập.
+| Flag | Giá trị / lựa chọn | Mặc định | Ý nghĩa |
+| --- | --- | --- | --- |
+| `--output` | Thư mục | `data/generated-pipes` tại gốc dự án | Lưu thư mục `pipes/` và manifest. |
+| `--difficulty` | Một hoặc nhiều giá trị `easy`, `medium`, `hard` | `hard` | Mức độ khó cần sinh. |
+| `--count` | Số nguyên ≥ 1 | `3` | Số đề cho mỗi mức. |
+| `--seed` | Số nguyên | `101` khi bỏ qua | Seed cơ sở; cộng `0/100/200` cho Easy/Medium/Hard và cộng chỉ số đề từ 0. |
+| `--rows` | Số nguyên ≥ 2 | `6` | Số hàng. |
+| `--cols` | Số nguyên ≥ 2 | `6` | Số cột. |
+| `--wrap` | Bật/tắt | Tắt | Cho phép nối qua biên; cả hai chiều phải ≥ 3. |
+| `--lock-ratio` | Số thực trong `[0, 1]` | `0.0` | Tỷ lệ ô khóa tối thiểu; generator có thể thêm khóa để bảo đảm nghiệm duy nhất. |
+| `--candidates` | Số nguyên ≥ 1 | `24` | Số ứng viên được xếp hạng cho mỗi đề. |
+| `--node-limit` | Số nguyên ≥ 1 | `20000` | Ngân sách node kiểm tra nghiệm duy nhất mỗi lần thử. |
+| `--overwrite` | Bật/tắt | Tắt | Cho phép thay thế đề trùng tên và manifest. |
 
-### Sinh riêng dữ liệu Pipes
+Manifest đầu ra liệt kê đợt vừa sinh. Khi sinh nhiều mức, dùng `--count` không quá 100 để tránh trùng dải seed.
 
-Script riêng mặc định sinh 3 đề Hard 6×6, không sinh Futoshiki; ghi vào `data/generated-pipes/` để giữ bộ dữ liệu gốc:
+## 6. Số liệu kết quả
 
-```bash
-python scripts/generate_pipes_inputs.py
-python scripts/generate_pipes_inputs.py --help
-```
+Số liệu lấy từ `results/tables/summary.csv`: 18 đề × 2 thuật toán × 10 lượt = **360 lượt timing**, tất cả giải thành công. Mỗi cặp đề/thuật toán có 1 lượt warm-up, 10 lượt timing và 1 lượt memory riêng; mỗi nhóm dưới đây có 30 lượt timing và 3 mẫu memory.
 
-Ví dụ sinh 3 đề Pipes Hard 6×6 có nối biên và tối thiểu 15% ô khóa:
+Thời gian và node là median trên các lượt giải thành công. Memory là median của peak cấp phát Python trong `solve()`, đo bằng `tracemalloc` sau khi nạp input. Thông tin máy và phiên bản Python của từng lượt nằm trong raw results.
 
-```bash
-python scripts/generate_pipes_inputs.py --difficulty hard --rows 6 --cols 6 \
-  --wrap --lock-ratio 0.15 --count 3 --seed 42 --output data/generated-pipes-wrap
-```
+| Puzzle | Kích thước | Độ khó | Thuật toán | Solved / lượt | Median thời gian (ms) | Median memory (KiB) | Median node mở rộng |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: |
+| Futoshiki | 4x4 | Easy | DFS | 30/30 | 0.35 | 8.33 | 8 |
+| Futoshiki | 4x4 | Easy | GBFS | 30/30 | 0.53 | 8.60 | 8 |
+| Futoshiki | 5x5 | Medium | DFS | 30/30 | 1.04 | 15.11 | 16 |
+| Futoshiki | 5x5 | Medium | GBFS | 30/30 | 3.00 | 15.85 | 16 |
+| Futoshiki | 6x6 | Hard | DFS | 30/30 | 4.83 | 37.12 | 53 |
+| Futoshiki | 6x6 | Hard | GBFS | 30/30 | 17.31 | 61.31 | 89 |
+| Pipes | 6x6 | Hard | DFS | 30/30 | 861.29 | 252.32 | 420 |
+| Pipes | 6x6 | Hard | GBFS | 30/30 | 932.91 | 269.10 | 434 |
+| Pipes | 7x7 | Hard | DFS | 30/30 | 2667.55 | 701.83 | 1098 |
+| Pipes | 7x7 | Hard | GBFS | 30/30 | 3843.91 | 1028.31 | 1421 |
+| Pipes | 8x8 | Hard | DFS | 30/30 | 6956.70 | 1505.78 | 1904 |
+| Pipes | 8x8 | Hard | GBFS | 30/30 | 11247.38 | 2131.80 | 2689 |
 
-Các tùy chọn: `--output`, `--difficulty` (một hoặc nhiều mức), `--count`, `--seed`, `--rows`, `--cols`, `--wrap`, `--lock-ratio`, `--candidates`, `--node-limit`, `--overwrite`. Nối biên yêu cầu cả hai chiều >= 3. Script mặc định từ chối ghi đè; chỉ dùng `--overwrite` khi muốn thay thế file trùng tên và manifest. Manifest chỉ liệt kê đợt vừa sinh; các file khác được giữ lại.
+## 7. Kiểm tra dữ liệu và chạy tests
 
-### Kết quả benchmark bộ dữ liệu chính
-
-Chín đề Pipes Hard nối biên 6×6, 7×7 và 8×8 trong `data/pipes/` thay thế bộ Pipes cũ. Benchmark dùng manifest chính và ghi đè `results/raw/benchmark.csv`, `results/raw/benchmark.json`; bảng và biểu đồ nằm ở `results/tables/summary.csv` và `results/charts/`. Các results riêng `pipes-wrap-6x6` đã được xóa; bộ sinh thử `data/generated-pipes-wrap-1/` đã được xóa.
-
-Mỗi kích thước Pipes có 3 đề × 10 lượt = 30 lượt timing cho mỗi thuật toán. Số liệu dưới đây lấy từ lần chạy mới trong raw results; thời gian là median, memory là median của các lượt memory thành công riêng biệt.
-
-| Kích thước | Thuật toán | Solved / lượt | Median thời gian (ms) | Median memory (KiB) | Median node mở rộng |
-| --- | --- | ---: | ---: | ---: | ---: |
-| 6x6 | DFS | 30/30 | 861.29 | 252.32 | 420 |
-| 6x6 | GBFS | 30/30 | 932.91 | 269.10 | 434 |
-| 7x7 | DFS | 30/30 | 2667.55 | 701.83 | 1098 |
-| 7x7 | GBFS | 30/30 | 3843.91 | 1028.31 | 1421 |
-| 8x8 | DFS | 30/30 | 6956.70 | 1505.78 | 1904 |
-| 8x8 | GBFS | 30/30 | 11247.38 | 2131.80 | 2689 |
-
-Kết quả phụ thuộc máy và phiên bản Python ghi trong raw data. So sánh thuật toán theo từng kích thước; GBFS không mặc nhiên nhanh hơn DFS. Các node mở rộng phản ánh lượng tìm kiếm, không phải số lần chuyển nhánh/quay lui.
-
-### Ý nghĩa event và số đo tìm kiếm
-
-`MetricsPanel.update_event()` chỉ cập nhật giao diện, không tham gia tính số đo benchmark. Khi hai node mở rộng liên tiếp không có quan hệ cha–con, GUI hiển thị “Chuyển nhánh xét”, nhưng không tích lũy số lần chuyển nhánh. Benchmark chạy `solve()` không có callback và tắt detailed events; các số đo vẫn được solver tính trực tiếp.
-
-`nodes_pruned` đếm node đã mở rộng nhưng không sinh được child mới (không có action hợp lệ hoặc mọi child đã được khám phá). **Không dùng chỉ số này làm số lần quay lui hoặc số nhánh sai.** GBFS có thể rời một node nằm trên đường nghiệm để xét nhánh khác vì thứ tự heuristic, rồi tiếp tục đường nghiệm sau đó; chuyển nhánh như vậy không làm tăng `nodes_pruned`. Ví dụ test mở rộng `A → B → C → E → D → G`, còn đường nghiệm là `A → B → D → G`: rời `B` để xét `C` không chứng minh `B` thất bại. Hiện CSV/JSON chưa có chỉ số đếm chuyển nhánh hay số bước quay về tổ tiên.
-
-## Kiểm thử và quality gate
+### `scripts/validate_submission.py`
 
 ```bash
-python -m compileall src
-pytest -q
 python scripts/validate_submission.py
 ```
 
-Hai file unit test mới:
+Script không có flags; đọc `data/benchmark_manifest.json`, kiểm tra ít nhất 18 đề, checksum, ID không trùng và đúng một nghiệm. Mã thoát `0` khi hợp lệ, `1` khi có lỗi.
 
-- `tests/unit/test_metrics_panel.py`: dùng biến giả để kiểm tra event tạo node/goal không xóa bộ đếm, event kết thúc giữ độ sâu nghiệm, và chuyển nhánh hiển thị đúng mà không gán nhánh cũ là thất bại. Không cần mở cửa sổ GUI, nhưng import vẫn cần Tkinter.
-- `tests/unit/test_summary.py`: kiểm tra bảng tổng hợp tách kích thước 6×6/7×7 và chỉ tính một mẫu memory cho mỗi đề, dù giá trị lặp trên nhiều dòng timing.
+### Các file kiểm thử
 
-`tests/unit/test_search.py` được bổ sung test chuyển nhánh GBFS từ tổ tiên của nghiệm và lý do prune child trùng; `tests/unit/test_pipes.py` bổ sung kiểm tra generator Hard và tính tái lập.
-
-Tests bao phủ bitmask/rotation, border và goal tree, domain và inequality, parser validation, deterministic DFS, priority/tie-break GBFS, cancellation và solve end-to-end cho cả hai puzzle.
-
-## Kiến trúc
-
-```text
-src/logic_search/
-├── core/          # protocol, node, result, event, cancellation
-├── search/        # frontier và solver DFS/GBFS dùng chung
-├── puzzles/       # Pipes, Futoshiki: model/parser/rules/heuristic/generator
-├── ui/            # Tkinter canvas, metrics, worker controller
-└── benchmark/     # process isolation, metadata, CSV/JSON export
+```bash
+python -m pytest -q
+python -m pytest tests/unit/test_pipes.py -q
+python -m pytest tests/integration -q
 ```
 
-DFS và GBFS dùng chung state, action, pruning và goal validator; chỉ khác frontier và việc GBFS tính `h`. State là tuple bất biến. DFS push child theo thứ tự đảo để khi pop vẫn giữ thứ tự action cố định. GBFS dùng `(h, depth, sequence_id)` để không so sánh object và đảm bảo tie-break tái lập.
+`-q` giảm thông tin in ra; đối số đường dẫn chọn file hoặc thư mục tests cần chạy.
 
-Chi tiết quyết định nằm ở [docs/ADR-001.md](docs/ADR-001.md). Khung báo cáo và slide nằm trong `report/` và `slides/`.
-
-## Giới hạn
-
-- Pipes hỗ trợ non-wrap, nối biên và ô khóa; nối biên yêu cầu cả hai chiều >= 3.
-- GBFS không đảm bảo đường đi tối ưu.
-- Peak memory là Python allocations do `tracemalloc`, không phải toàn bộ RSS.
-- File PDF/PPTX cuối cần nhóm điền thành viên, thông tin môn học và số liệu benchmark chính thức trước khi nộp.
+| File | Nội dung kiểm tra |
+| --- | --- |
+| `tests/unit/test_pipes.py` | Phép xoay, ràng buộc, parser và generator Pipes. |
+| `tests/unit/test_futoshiki.py` | Miền giá trị, bất đẳng thức, parser và generator Futoshiki. |
+| `tests/unit/test_search.py` | DFS, GBFS, frontier, event và hủy tìm kiếm. |
+| `tests/unit/test_game_logic.py` | Thao tác chơi, xung đột và gợi ý. |
+| `tests/integration/test_end_to_end.py` | Giải đề và kiểm tra nghiệm đầu cuối. |
+| `tests/integration/test_benchmark.py` | Chạy benchmark và kiểm tra dữ liệu xuất. |
