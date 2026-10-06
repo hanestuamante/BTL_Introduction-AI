@@ -14,12 +14,18 @@ class EventType(str, Enum):
     GOAL_FOUND = "GOAL_FOUND"
     FINISHED = "FINISHED"
     ERROR = "ERROR"
+    CELL_DOMAIN = "CELL_DOMAIN"
+    VALUE_TRIED = "VALUE_TRIED"
+    VALUE_REJECTED = "VALUE_REJECTED"
+    BACKTRACK = "BACKTRACK"
 
 
 @dataclass(slots=True, frozen=True)
 class SearchEvent:
     type: EventType
     elapsed_ms: float
+    node_id: int | None = None
+    parent_id: int | None = None
     state_key: Hashable | None = None
     state: Any = None
     action: Any = None
@@ -30,13 +36,18 @@ class SearchEvent:
     nodes_pruned: int = 0
     frontier_size: int = 0
     message: str = ""
+    cell: int | None = None
+    value: int | None = None
+    domain: tuple[int, ...] | None = None
+    reason: str | None = None
 
 
 class EventEmitter:
     def __init__(self, callback=None, *, detailed: bool = True) -> None:
         self.callback = callback
         self.detailed = detailed
-        self.started_at = perf_counter()
+        self.accumulated_ms = 0.0
+        self.last_active = perf_counter()
 
     def emit(self, event_type: EventType, **kwargs: Any) -> None:
         if self.callback is None:
@@ -45,9 +56,17 @@ class EventEmitter:
             EventType.NODE_GENERATED,
             EventType.NODE_EXPANDED,
             EventType.NODE_PRUNED,
+            EventType.CELL_DOMAIN,
+            EventType.VALUE_TRIED,
+            EventType.VALUE_REJECTED,
+            EventType.BACKTRACK,
         }:
             return
-        self.callback(
-            SearchEvent(event_type, (perf_counter() - self.started_at) * 1000, **kwargs)
-        )
+        now = perf_counter()
+        self.accumulated_ms += (now - self.last_active) * 1000
+        event = SearchEvent(event_type, self.accumulated_ms, **kwargs)
+        try:
+            self.callback(event)
+        finally:
+            self.last_active = perf_counter()
 

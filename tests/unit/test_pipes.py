@@ -26,3 +26,21 @@ def test_border_filter_and_tree_goal():
     assert N not in problem.domain(problem.initial_state, 0)
     assert problem.is_goal((E, S | W, E, N | W))
     assert validate_solution(problem, (E, S | W, E, N | W))
+
+
+def test_generator_ranks_actual_solver_effort_and_is_reproducible():
+    from logic_search.puzzles.pipes.generator import count_solutions, generate_pipes
+    from logic_search.search.solver import solve
+
+    data = generate_pipes(3, 3, 123, wrap=True, candidates=3)
+    assert data == generate_pipes(3, 3, 123, wrap=True, candidates=3)
+    problem = parse_pipes(data)
+    assert count_solutions(problem) == 1
+    effort = data["metadata"]["solver_effort"]
+    for algorithm in ("dfs", "gbfs"):
+        result = solve(problem, algorithm)
+        assert effort[algorithm]["nodes_expanded"] == result.metrics.nodes_expanded
+        assert effort[algorithm]["nodes_pruned"] == result.metrics.nodes_pruned
+    expanded = [effort[algorithm]["nodes_expanded"] for algorithm in ("dfs", "gbfs")]
+    assert data["metadata"]["difficulty_score"] == min(expanded) + sum(expanded) / 10
+    assert data["metadata"]["difficulty"] == "hard"
