@@ -40,6 +40,7 @@ class SearchEvent:
     value: int | None = None
     domain: tuple[int, ...] | None = None
     reason: str | None = None
+    frontier_items: tuple[str, ...] | None = None
 
 
 class EventEmitter:
@@ -48,6 +49,7 @@ class EventEmitter:
         self.detailed = detailed
         self.accumulated_ms = 0.0
         self.last_active = perf_counter()
+        self.frontier_provider = None
 
     def emit(self, event_type: EventType, **kwargs: Any) -> None:
         if self.callback is None:
@@ -62,6 +64,8 @@ class EventEmitter:
             EventType.BACKTRACK,
         }:
             return
+        if "frontier_items" not in kwargs and self.frontier_provider is not None:
+            kwargs["frontier_items"] = self.frontier_provider()
         now = perf_counter()
         self.accumulated_ms += (now - self.last_active) * 1000
         event = SearchEvent(event_type, self.accumulated_ms, **kwargs)

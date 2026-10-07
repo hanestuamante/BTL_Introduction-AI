@@ -17,6 +17,67 @@ from .pipes_canvas import PipesCanvas
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_INPUT = ROOT / "data/futoshiki/futoshiki-4x4-easy-seed-201.json"
 
+FUTOSHIKI_BOTTOM_HINT = "Phím tắt: [Enter] Chạy • [Space] Dừng/Tiếp tục • [→ / S] Bước • [Esc] Hủy • Click ô rồi nhập 1–N"
+
+CARD_THEMES = {
+    "domain": {
+        "bg": "#f0f9ff",
+        "border": "#0284c7",
+        "badge_bg": "#e0f2fe",
+        "badge_fg": "#0369a1",
+        "text_fg": "#0c4a6e",
+        "badge_text": "🔍 XÉT GIÁ TRỊ THOẢ",
+    },
+    "trial": {
+        "bg": "#fffbeb",
+        "border": "#d97706",
+        "badge_bg": "#fef3c7",
+        "badge_fg": "#b45309",
+        "text_fg": "#78350f",
+        "badge_text": "⚡ ĐANG THỬ",
+    },
+    "rejected": {
+        "bg": "#fef2f2",
+        "border": "#dc2626",
+        "badge_bg": "#fee2e2",
+        "badge_fg": "#b91c1c",
+        "text_fg": "#7f1d1d",
+        "badge_text": "❌ LOẠI BỎ",
+    },
+    "solved": {
+        "bg": "#f0fdf4",
+        "border": "#16a34a",
+        "badge_bg": "#dcfce7",
+        "badge_fg": "#15803d",
+        "text_fg": "#14532d",
+        "badge_text": "🎉 THÀNH CÔNG",
+    },
+    "warning": {
+        "bg": "#fff7ed",
+        "border": "#f97316",
+        "badge_bg": "#ffedd5",
+        "badge_fg": "#c2410c",
+        "text_fg": "#7c2d12",
+        "badge_text": "⚠️ LƯU Ý",
+    },
+    "info": {
+        "bg": "#f8fafc",
+        "border": "#3b82f6",
+        "badge_bg": "#eff6ff",
+        "badge_fg": "#1d4ed8",
+        "text_fg": "#1e293b",
+        "badge_text": "ℹ️ HOẠT ĐỘNG",
+    },
+    "default": {
+        "bg": "#f8fafc",
+        "border": "#94a3b8",
+        "badge_bg": "#f1f5f9",
+        "badge_fg": "#475569",
+        "text_fg": "#334155",
+        "badge_text": "💡 HƯỚNG DẪN",
+    },
+}
+
 
 class MainWindow:
     def __init__(self, root: tk.Tk) -> None:
@@ -42,11 +103,56 @@ class MainWindow:
         self.algorithm = tk.StringVar(value="dfs")
         self.input_path = tk.StringVar(value=str(DEFAULT_INPUT))
         self.status = tk.StringVar(value="Chọn ô trống và nhập số 1–N.")
+        self.futoshiki_step_text = tk.StringVar(value="Sẵn sàng: chọn ô trắng để bắt đầu.")
+        self.queue_text = tk.StringVar(value="[Trống]")
         self._build()
         self.root.bind("<Key>", self._on_key)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.root.after(30, self._poll)
         self.load()
+
+    def _update_futoshiki_card(self, kind: str, message: str, frontier_items: tuple[str, ...] | None = None) -> None:
+        if not hasattr(self, "step_card"):
+            return
+        theme = CARD_THEMES.get(kind, CARD_THEMES["default"])
+        self.step_card.configure(
+            bg=theme["bg"],
+            highlightbackground=theme["border"],
+            highlightcolor=theme["border"],
+        )
+        if hasattr(self, "step_left_frame"):
+            self.step_left_frame.configure(bg=theme["bg"])
+        self.step_badge.configure(
+            text=theme["badge_text"],
+            bg=theme["badge_bg"],
+            fg=theme["badge_fg"],
+        )
+        self.step_label.configure(bg=theme["bg"], fg=theme["text_fg"])
+        self.futoshiki_step_text.set(message)
+
+        if hasattr(self, "step_divider"):
+            self.step_divider.configure(bg=theme["border"])
+        if hasattr(self, "step_right_frame"):
+            self.step_right_frame.configure(bg=theme["bg"])
+            is_dfs = self.algorithm.get() == "dfs"
+            q_badge_title = "📚 STACK (LIFO)" if is_dfs else "⚡ PRIORITY QUEUE"
+            self.queue_badge.configure(
+                text=q_badge_title,
+                bg=theme["badge_bg"],
+                fg=theme["badge_fg"],
+            )
+            self.queue_label.configure(bg=theme["bg"], fg=theme["text_fg"])
+            if frontier_items is not None:
+                if frontier_items:
+                    self.queue_text.set("  ".join(frontier_items))
+                else:
+                    self.queue_text.set("[Trống]")
+
+    def _set_status(self, message: str, kind: str = "default", frontier_items: tuple[str, ...] | None = None) -> None:
+        if self.problem is not None and hasattr(self.problem, "size"):
+            self._update_futoshiki_card(kind, message, frontier_items=frontier_items)
+        else:
+            self.status.set(message)
 
     def _clear_domain_state(self) -> None:
         self.active_cell = None
@@ -75,6 +181,82 @@ class MainWindow:
         body.pack(fill="both", expand=True)
         self.canvas_host = ttk.Frame(body)
         self.canvas_host.pack(side="left", fill="both", expand=True)
+
+        # Futoshiki Step Card (top of game board)
+        self.step_card = tk.Frame(
+            self.canvas_host,
+            bg="#f8fafc",
+            highlightthickness=2,
+            highlightbackground="#94a3b8",
+            padx=10,
+            pady=6,
+        )
+
+        # Left side: Instructional step
+        self.step_left_frame = tk.Frame(self.step_card, bg="#f8fafc")
+        self.step_left_frame.pack(side="left", fill="both", expand=True, padx=(0, 6))
+
+        self.step_badge = tk.Label(
+            self.step_left_frame,
+            text="💡 HƯỚNG DẪN",
+            font=("Segoe UI", 9, "bold"),
+            bg="#f1f5f9",
+            fg="#475569",
+            padx=8,
+            pady=3,
+        )
+        self.step_badge.pack(side="left", anchor="n", padx=(0, 8))
+
+        self.step_label = tk.Label(
+            self.step_left_frame,
+            textvariable=self.futoshiki_step_text,
+            font=("Segoe UI", 10, "bold"),
+            bg="#f8fafc",
+            fg="#334155",
+            anchor="w",
+            justify="left",
+            wraplength=320,
+        )
+        self.step_label.pack(side="left", fill="both", expand=True)
+
+        # Vertical divider
+        self.step_divider = tk.Frame(self.step_card, bg="#cbd5e1", width=1)
+        self.step_divider.pack(side="left", fill="y", padx=8)
+
+        # Right side: Queue/Stack status
+        self.step_right_frame = tk.Frame(self.step_card, bg="#f8fafc")
+        self.step_right_frame.pack(side="left", fill="both", expand=True, padx=(4, 0))
+
+        self.queue_badge = tk.Label(
+            self.step_right_frame,
+            text="📚 STACK (LIFO)",
+            font=("Segoe UI", 9, "bold"),
+            bg="#f1f5f9",
+            fg="#475569",
+            padx=8,
+            pady=3,
+        )
+        self.queue_badge.pack(side="left", anchor="n", padx=(0, 8))
+
+        self.queue_label = tk.Label(
+            self.step_right_frame,
+            textvariable=self.queue_text,
+            font=("Segoe UI", 9, "bold"),
+            bg="#f8fafc",
+            fg="#334155",
+            anchor="w",
+            justify="left",
+            wraplength=320,
+        )
+        self.queue_label.pack(side="left", fill="both", expand=True)
+
+        def _on_queue_frame_resize(event):
+            half = max(140, int(event.width / 2) - 40)
+            self.step_label.configure(wraplength=half)
+            self.queue_label.configure(wraplength=half)
+
+        self.step_card.bind("<Configure>", _on_queue_frame_resize)
+
         self.canvas = tk.Canvas(self.canvas_host, background="white", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
         side = ttk.Frame(body)
@@ -98,7 +280,9 @@ class MainWindow:
         search = ttk.LabelFrame(self.root, text="Xem thuật toán giải", padding=8)
         search.pack(fill="x", padx=10, pady=5)
         ttk.Label(search, text="Thuật toán:").pack(side="left")
-        ttk.Combobox(search, textvariable=self.algorithm, values=("dfs", "gbfs"), state="readonly", width=7).pack(side="left", padx=5)
+        combo = ttk.Combobox(search, textvariable=self.algorithm, values=("dfs", "gbfs"), state="readonly", width=7)
+        combo.pack(side="left", padx=5)
+        combo.bind("<<ComboboxSelected>>", lambda _e: self._on_algorithm_change())
         for text, command in (
             ("▶ Chạy", self.run),
             ("⏸ Dừng", self.pause_search),
@@ -113,6 +297,11 @@ class MainWindow:
         status_bar = ttk.Frame(self.root, padding=(12, 5, 12, 10))
         status_bar.pack(fill="x")
         ttk.Label(status_bar, textvariable=self.status, anchor="w").pack(fill="x")
+
+    def _on_algorithm_change(self) -> None:
+        if hasattr(self, "queue_badge") and hasattr(self, "problem") and self.problem is not None and hasattr(self.problem, "size"):
+            is_dfs = self.algorithm.get() == "dfs"
+            self.queue_badge.configure(text="📚 STACK (LIFO)" if is_dfs else "⚡ PRIORITY QUEUE")
 
     def browse(self) -> None:
         path = filedialog.askopenfilename(initialdir=ROOT / "data", filetypes=(("JSON puzzle", "*.json"), ("All files", "*")))
@@ -136,6 +325,8 @@ class MainWindow:
         self.solved = False
         self._replace_canvas()
         if hasattr(self.problem, "size"):
+            self.step_card.pack(side="top", fill="x", padx=4, pady=(2, 6), before=self.canvas)
+            self._update_futoshiki_card("default", f"Futoshiki {self.problem.size}×{self.problem.size}: chọn ô trắng để bắt đầu.", frontier_items=())
             self._build_number_pad(self.problem.size)
             self.help_label.configure(
                 text="• [Space]: Dừng/Tiếp tục  • [→ / S]: Từng bước\n"
@@ -143,8 +334,9 @@ class MainWindow:
                      "• Bấm ô trắng rồi nhập 1–N\n"
                      "• Backspace/0 để xóa ô"
             )
-            self.status.set(f"Futoshiki {self.problem.size}×{self.problem.size}: chọn ô trắng để bắt đầu.")
+            self.status.set(FUTOSHIKI_BOTTOM_HINT)
         else:
+            self.step_card.pack_forget()
             self._build_number_pad(0)
             self.help_label.configure(
                 text="• [Space]: Dừng/Tiếp tục  • [→ / S]: Từng bước\n"
@@ -216,17 +408,17 @@ class MainWindow:
         self.selected = index
         if hasattr(self.problem, "size"):
             if self.problem.givens[index]:
-                self.status.set("Ô màu xám là số cho sẵn, không thể sửa.")
+                self._set_status("Ô màu xám là số cho sẵn, không thể sửa.", kind="warning")
             else:
-                self.status.set(f"Ô hàng {index // self.problem.size + 1}, cột {index % self.problem.size + 1}: nhập số 1–{self.problem.size}.")
+                self._set_status(f"Ô hàng {index // self.problem.size + 1}, cột {index % self.problem.size + 1}: nhập số 1–{self.problem.size}.", kind="info")
                 self._draw()
         else:
             if self.problem.is_locked(index):
-                self.status.set("Ô này đã khóa, không thể xoay.")
+                self._set_status("Ô này đã khóa, không thể xoay.", kind="warning")
                 self._draw()
                 return
             self._remember(rotate_pipe(self.problem, self.current_state, index, -1 if reverse else 1))
-            self.status.set("Đã xoay ống. Nhấn ‘Kiểm tra’ khi mạng đã nối hoàn chỉnh.")
+            self._set_status("Đã xoay ống. Nhấn ‘Kiểm tra’ khi mạng đã nối hoàn chỉnh.", kind="info")
 
     def _on_key(self, event) -> None:
         if isinstance(event.widget, (ttk.Entry, tk.Entry)):
@@ -260,13 +452,13 @@ class MainWindow:
 
     def _enter_value(self, value: int) -> None:
         if self.problem is None or self.current_state is None or self.selected is None or not hasattr(self.problem, "size"):
-            self.status.set("Hãy chọn một ô trắng trước khi nhập số.")
+            self._set_status("Hãy chọn một ô trắng trước khi nhập số.", kind="warning")
             return
         self._clear_domain_state()
         updated = set_futoshiki_value(self.problem, self.current_state, self.selected, value)
         self._remember(updated)
         self.conflicts = futoshiki_conflicts(self.problem, updated)
-        self.status.set("Có xung đột ở các ô đỏ." if self.conflicts else "Hợp lệ đến hiện tại. Tiếp tục điền các ô còn trống.")
+        self._set_status("Có xung đột ở các ô đỏ." if self.conflicts else "Hợp lệ đến hiện tại. Tiếp tục điền các ô còn trống.", kind="rejected" if self.conflicts else "info")
         self._draw()
 
     def check(self) -> None:
@@ -281,14 +473,14 @@ class MainWindow:
         self.solved = self.problem.is_goal(self.current_state)
         if self.solved:
             self.conflicts.clear()
-            self.status.set("🎉 Chính xác! Bạn đã giải xong puzzle.")
+            self._set_status("🎉 Chính xác! Bạn đã giải xong puzzle.", kind="solved")
             messagebox.showinfo("Hoàn thành", "Chúc mừng! Bạn đã giải đúng puzzle.")
         elif self.conflicts:
-            self.status.set(f"Chưa đúng: có {len(self.conflicts)} ô xung đột (tô đỏ).")
+            self._set_status(f"Chưa đúng: có {len(self.conflicts)} ô xung đột (tô đỏ).", kind="rejected")
         elif incomplete:
-            self.status.set("Chưa hoàn thành: vẫn còn ô trống nhưng chưa có xung đột trực tiếp.")
+            self._set_status("Chưa hoàn thành: vẫn còn ô trống nhưng chưa có xung đột trực tiếp.", kind="warning")
         else:
-            self.status.set("Chưa đúng: mạng ống chưa liên thông hoặc đang có chu trình.")
+            self._set_status("Chưa đúng: mạng ống chưa liên thông hoặc đang có chu trình.", kind="rejected")
         self._draw()
 
     def _get_solution(self) -> tuple[int, ...] | None:
@@ -296,14 +488,14 @@ class MainWindow:
             result = solve(self.problem, "gbfs", timeout=10, detailed_events=False)
             if result.status == "solved":
                 self.solution = result.path[-1]
-        return self.solution
+            return self.solution
 
     def hint(self) -> None:
         if self.problem is None or self.current_state is None:
             return
         solution = self._get_solution()
         if solution is None:
-            self.status.set("Không tìm được gợi ý trong thời gian cho phép.")
+            self._set_status("Không tìm được gợi ý trong thời gian cho phép.", kind="warning")
             return
         candidates = [i for i, (current, target) in enumerate(zip(self.current_state, solution)) if current != target]
         if not candidates:
@@ -315,19 +507,19 @@ class MainWindow:
         self.selected = index
         self._remember(tuple(values))
         if hasattr(self.problem, "size"):
-            self.status.set(f"Gợi ý: ô hàng {index // self.problem.size + 1}, cột {index % self.problem.size + 1}.")
+            self._set_status(f"Gợi ý: ô hàng {index // self.problem.size + 1}, cột {index % self.problem.size + 1}.", kind="trial")
         else:
-            self.status.set(f"Gợi ý: hướng đúng cho ô hàng {index // self.problem.cols + 1}, cột {index % self.problem.cols + 1}.")
+            self._set_status(f"Gợi ý: hướng đúng cho ô hàng {index // self.problem.cols + 1}, cột {index % self.problem.cols + 1}.", kind="trial")
 
     def pause_search(self) -> None:
         if self.controller.state.running and not self.controller.state.paused:
             self.controller.pause()
-            self.status.set("Đã tạm dừng tìm kiếm. Nhấn ‘Tiếp tục’ hoặc [Space] để tiếp tục.")
+            self._set_status("Đã tạm dừng tìm kiếm. Nhấn ‘Tiếp tục’ hoặc [Space] để tiếp tục.", kind="warning")
 
     def resume_search(self) -> None:
         if self.controller.state.running and self.controller.state.paused:
             self.controller.resume()
-            self.status.set(f"Đang tiếp tục tìm kiếm {self.algorithm.get().upper()}…")
+            self._set_status(f"Đang tiếp tục tìm kiếm {self.algorithm.get().upper()}…", kind="info")
         elif not self.controller.state.running:
             self.run()
 
@@ -349,7 +541,7 @@ class MainWindow:
         self.conflicts = set()
         self._clear_domain_state()
         self.solved = False
-        self.status.set(f"Đang chạy {self.algorithm.get().upper()}…")
+        self._set_status(f"Đang chạy {self.algorithm.get().upper()}…", kind="info")
         self.controller.start(self.problem, self.algorithm.get())
 
     def step(self) -> None:
@@ -360,15 +552,13 @@ class MainWindow:
             self.conflicts = set()
             self._clear_domain_state()
             self.solved = False
-            self.status.set("Step mode: bắt đầu từng bước…")
             self.controller.start(self.problem, self.algorithm.get(), paused=True)
         self.controller.step()
-        self.status.set("Step mode: thực hiện 1 thao tác.")
 
     def cancel_search(self) -> None:
         self.controller.cancel()
         self._clear_domain_state()
-        self.status.set("Đã hủy quá trình tìm kiếm.")
+        self._set_status("Đã hủy quá trình tìm kiếm.", kind="default", frontier_items=())
         self._draw()
 
     def back(self) -> None:
@@ -379,7 +569,7 @@ class MainWindow:
             self.solved = False
             self._clear_domain_state()
             self._draw()
-            self.status.set("Đã quay lại trạng thái trước.")
+            self._set_status("Đã quay lại trạng thái trước.", kind="default")
 
     def reset(self) -> None:
         self.controller.cancel()
@@ -391,10 +581,16 @@ class MainWindow:
             self.conflicts = set()
             self.solved = False
             self._draw()
-            self.status.set("Đã khôi phục đề ban đầu.")
+            self._set_status("Đã khôi phục đề ban đầu.", kind="default", frontier_items=())
 
     def _handle_event(self, event) -> None:
         self.metrics.update_event(event)
+        if event.frontier_items is not None and hasattr(self, "queue_text"):
+            if event.frontier_items:
+                self.queue_text.set("  ".join(event.frontier_items))
+            else:
+                self.queue_text.set("[Trống]")
+
         if event.type == EventType.CELL_DOMAIN:
             self.active_cell = event.cell
             self.active_kind = "domain"
@@ -406,7 +602,7 @@ class MainWindow:
                 self.cell_rejected[event.cell] = set()
             self._prune_inactive_cells(self.current_state, keep_cell=event.cell)
             if event.message:
-                self.status.set(event.message)
+                self._set_status(event.message, kind="domain", frontier_items=event.frontier_items)
             self._draw()
         elif event.type == EventType.VALUE_TRIED:
             if event.state is not None:
@@ -418,7 +614,7 @@ class MainWindow:
             if event.cell is not None and event.domain is not None:
                 self.cell_domains[event.cell] = event.domain
             if event.message:
-                self.status.set(event.message)
+                self._set_status(event.message, kind="trial", frontier_items=event.frontier_items)
             self._draw()
         elif event.type == EventType.VALUE_REJECTED:
             if event.state is not None:
@@ -437,7 +633,7 @@ class MainWindow:
                     self.cell_rejected.setdefault(event.cell, set()).add(event.value)
             self._prune_inactive_cells(self.current_state, keep_cell=event.cell)
             if event.message:
-                self.status.set(event.message)
+                self._set_status(event.message, kind="rejected", frontier_items=event.frontier_items)
             self._draw()
         elif event.state is not None and event.type in {EventType.STARTED, EventType.NODE_EXPANDED, EventType.GOAL_FOUND}:
             self.current_state = event.state
@@ -464,13 +660,19 @@ class MainWindow:
                     self.cell_rejected.setdefault(self.active_cell, set()).add(self.active_value)
             self._prune_inactive_cells(self.current_state, keep_cell=self.active_cell)
             if event.message:
-                self.status.set(event.message)
+                self._set_status(event.message, kind="rejected", frontier_items=event.frontier_items)
             self._draw()
 
         if event.type == EventType.GOAL_FOUND:
-            self.status.set("🎉 Thuật toán đã tìm thấy nghiệm.")
+            self._set_status("🎉 Thuật toán đã tìm thấy nghiệm.", kind="solved", frontier_items=event.frontier_items)
         elif event.type == EventType.FINISHED and event.message != "solved":
-            self.status.set(f"Tìm kiếm kết thúc: {event.message}.")
+            finish_map = {
+                "Frontier exhausted": "Hàng đợi rỗng (không tìm thấy nghiệm)",
+                "Search cancelled": "Đã hủy tìm kiếm",
+                "timeout": "Hết thời gian tìm kiếm",
+            }
+            msg = finish_map.get(event.message, event.message)
+            self._set_status(f"Tìm kiếm kết thúc: {msg}.", kind="default", frontier_items=event.frontier_items)
         elif event.type == EventType.ERROR:
             messagebox.showerror("Lỗi tìm kiếm", event.message)
 

@@ -84,7 +84,7 @@ class FutoshikiProblem:
                 state=state,
                 cell=index,
                 domain=domain_values,
-                message=f"Xét ô hàng {r + 1}, cột {c + 1}: domain = {{{', '.join(map(str, domain_values))}}}",
+                message=f"Xét ô hàng {r + 1}, cột {c + 1}: các giá trị có thể thoả là {{{', '.join(map(str, domain_values))}}}",
                 **kwargs,
             )
         if not domain_values:

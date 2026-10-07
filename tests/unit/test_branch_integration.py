@@ -112,6 +112,12 @@ def test_futoshiki_solver_micro_events_preserve_search_results(algorithm):
     assert visual.path == plain.path and visual.actions == plain.actions
     assert any(e.type == EventType.CELL_DOMAIN for e in events)
     assert any(e.type == EventType.VALUE_TRIED for e in events)
+    events_with_frontier = [e for e in events if e.frontier_items is not None and len(e.frontier_items) > 0]
+    assert len(events_with_frontier) > 0
+    if algorithm == "dfs":
+        assert any(all(item.startswith("[ô(") and "h=" not in item for item in e.frontier_items) for e in events_with_frontier)
+    else:
+        assert any(all(item.startswith("[ô(") and "h=" in item for item in e.frontier_items) for e in events_with_frontier)
     assert [e.type for e in plain_events] == [EventType.STARTED, EventType.GOAL_FOUND, EventType.FINISHED]
     for field in ("nodes_expanded", "nodes_generated", "nodes_pruned", "duplicate_states"):
         assert getattr(visual.metrics, field) == getattr(plain.metrics, field)
@@ -191,3 +197,68 @@ def test_window_draw_preserves_water_and_domain_visualization(puzzle, canvas_cla
         assert options["active_cell"] == 0
         assert options["domain_values"] == (1, 2)
         assert options["rejected_values"] == {1}
+
+
+def test_futoshiki_step_card_updates_and_pipes_fallback():
+    window = object.__new__(MainWindow)
+    futoshiki_problem = load_problem(ROOT / "data/futoshiki/futoshiki-4x4-easy-seed-201.json")
+    pipes_problem = load_problem(ROOT / "data/pipes/pipes-6x6-hard-wrap-seed-601.json")
+
+    class DummyVar:
+        def __init__(self, val=""):
+            self.value = val
+        def set(self, val):
+            self.value = val
+        def get(self):
+            return self.value
+
+    class DummyWidget:
+        def __init__(self):
+            self.config = {}
+        def configure(self, **kwargs):
+            self.config.update(kwargs)
+
+    window.step_card = DummyWidget()
+    window.step_badge = DummyWidget()
+    window.step_label = DummyWidget()
+    window.step_divider = DummyWidget()
+    window.step_right_frame = DummyWidget()
+    window.queue_badge = DummyWidget()
+    window.queue_label = DummyWidget()
+    window.futoshiki_step_text = DummyVar()
+    window.queue_text = DummyVar()
+    window.status = DummyVar()
+    window.algorithm = DummyVar("dfs")
+
+    window.problem = futoshiki_problem
+    window._set_status("Xét ô hàng 1, cột 2", kind="domain", frontier_items=("[ô(1,2)=3]", "[ô(1,2)=2]"))
+    assert window.futoshiki_step_text.get() == "Xét ô hàng 1, cột 2"
+    assert window.step_card.config["highlightbackground"] == "#0284c7"
+    assert window.step_badge.config["text"] == "🔍 XÉT GIÁ TRỊ THOẢ"
+    assert window.queue_badge.config["text"] == "📚 STACK (LIFO)"
+    assert window.queue_text.get() == "[ô(1,2)=3]  [ô(1,2)=2]"
+
+    window._set_status("Thử điền 3", kind="trial")
+    assert window.futoshiki_step_text.get() == "Thử điền 3"
+    assert window.step_card.config["highlightbackground"] == "#d97706"
+    assert window.step_badge.config["text"] == "⚡ ĐANG THỬ"
+
+    window.algorithm.set("gbfs")
+    window._on_algorithm_change()
+    assert window.queue_badge.config["text"] == "⚡ PRIORITY QUEUE"
+
+    window._set_status("Loại 3", kind="rejected", frontier_items=("[ô(1,2)=3, h=1]",))
+    assert window.futoshiki_step_text.get() == "Loại 3"
+    assert window.step_card.config["highlightbackground"] == "#dc2626"
+    assert window.step_badge.config["text"] == "❌ LOẠI BỎ"
+    assert window.queue_badge.config["text"] == "⚡ PRIORITY QUEUE"
+    assert window.queue_text.get() == "[ô(1,2)=3, h=1]"
+
+    window._set_status("Hoàn thành", kind="solved", frontier_items=())
+    assert window.queue_text.get() == "[Trống]"
+
+    window.problem = pipes_problem
+    window._set_status("Đã xoay ống", kind="info")
+    assert window.status.get() == "Đã xoay ống"
+
+

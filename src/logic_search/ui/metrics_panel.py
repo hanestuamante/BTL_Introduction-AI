@@ -19,13 +19,20 @@ class MetricsPanel(ttk.LabelFrame):
             ttk.Label(self, textvariable=self.variables[name], width=24, wraplength=190).grid(row=row, column=1, sticky="w")
 
     def update_event(self, event) -> None:
+        finish_map = {
+            "solved": "Đã tìm thấy nghiệm",
+            "Frontier exhausted": "Hàng đợi rỗng",
+            "Search cancelled": "Đã hủy tìm kiếm",
+            "timeout": "Hết thời gian",
+        }
+        finish_text = finish_map.get(event.message, event.message)
         labels = {
             EventType.STARTED: "Đang tìm kiếm",
             EventType.NODE_GENERATED: "Đã tạo node chờ xét",
             EventType.NODE_EXPANDED: "Đang mở rộng node",
-            EventType.NODE_PRUNED: "Không sinh child mới",
+            EventType.NODE_PRUNED: "Không sinh nhánh con mới",
             EventType.GOAL_FOUND: "Đã tìm thấy nghiệm",
-            EventType.FINISHED: f"Kết thúc: {event.message}",
+            EventType.FINISHED: f"Kết thúc: {finish_text}",
             EventType.ERROR: "Lỗi tìm kiếm",
             EventType.CELL_DOMAIN: "Đang xét miền giá trị",
             EventType.VALUE_TRIED: "Đang thử giá trị",
@@ -46,7 +53,7 @@ class MetricsPanel(ttk.LabelFrame):
             self.variables["transition"].set("Chuyển nhánh xét" if switched else "Tiếp tục mở rộng")
             self._previous_node_id = event.node_id
         if event.type == EventType.NODE_PRUNED:
-            self.variables["transition"].set("Ngõ cụt" if event.message == "No valid actions" else "Child đã được khám phá")
+            self.variables["transition"].set("Ngõ cụt" if event.message == "No valid actions" else "Nhánh con đã được khám phá")
         if event.type in {EventType.STARTED, EventType.NODE_EXPANDED, EventType.NODE_PRUNED, EventType.FINISHED}:
             for field, value in (("generated", event.nodes_generated), ("expanded", event.nodes_expanded), ("pruned", event.nodes_pruned), ("frontier", event.frontier_size)):
                 self.variables[field].set(str(value))

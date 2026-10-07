@@ -84,6 +84,58 @@ def solve(
         return SearchResult(status, path, actions, metrics, message)
 
     visual_events = detailed_events and on_event is not None
+    if visual_events:
+        def _get_frontier_items() -> tuple[str, ...]:
+            if not len(frontier):
+                return ()
+            items: list[str] = []
+            if algorithm == "dfs":
+                stack_ids = list(reversed(getattr(frontier, "_items", [])))
+                for nid in stack_ids:
+                    act = nodes[nid].action
+                    if isinstance(act, tuple) and len(act) == 2:
+                        cell, val = act
+                        if hasattr(problem, "size"):
+                            r = cell // problem.size + 1
+                            c = cell % problem.size + 1
+                            items.append(f"[ô({r},{c})={val}]")
+                        elif hasattr(problem, "cols"):
+                            r = cell // problem.cols + 1
+                            c = cell % problem.cols + 1
+                            items.append(f"[ô({r},{c})={val}]")
+                        else:
+                            items.append(f"[{act}]")
+                    elif act is None:
+                        items.append("[gốc]")
+                    else:
+                        items.append(f"[{act}]")
+            else:
+                heap_items = getattr(frontier, "_items", [])
+                heap_sorted = sorted(heap_items)
+                for _p, _d, _seq, nid in heap_sorted:
+                    act = nodes[nid].action
+                    h_val = nodes[nid].h
+                    h_str = f"{int(h_val)}" if float(h_val).is_integer() else f"{h_val:g}"
+                    if isinstance(act, tuple) and len(act) == 2:
+                        cell, val = act
+                        if hasattr(problem, "size"):
+                            r = cell // problem.size + 1
+                            c = cell % problem.size + 1
+                            items.append(f"[ô({r},{c})={val}, h={h_str}]")
+                        elif hasattr(problem, "cols"):
+                            r = cell // problem.cols + 1
+                            c = cell % problem.cols + 1
+                            items.append(f"[ô({r},{c})={val}, h={h_str}]")
+                        else:
+                            items.append(f"[{act}, h={h_str}]")
+                    elif act is None:
+                        items.append(f"[gốc, h={h_str}]")
+                    else:
+                        items.append(f"[{act}, h={h_str}]")
+            return tuple(items)
+
+        emitter.frontier_provider = _get_frontier_items
+
     assignment_problem = hasattr(problem, "size") and hasattr(problem, "domain")
     domain_backtracking = visual_events and algorithm == "dfs" and assignment_problem
     last_expanded_id: int | None = None
@@ -252,7 +304,7 @@ def solve(
                                 nodes_pruned=metrics.nodes_pruned,
                                 frontier_size=len(frontier),
                                 reason="all_failed",
-                                message=f"Ngõ cụt: ô hàng {empty_idx // getattr(problem, 'size', 1) + 1}, cột {empty_idx % getattr(problem, 'size', 1) + 1} đã thử hết domain nhưng đều thất bại",
+                                message=f"Ngõ cụt: ô hàng {empty_idx // getattr(problem, 'size', 1) + 1}, cột {empty_idx % getattr(problem, 'size', 1) + 1} đã thử hết các giá trị có thể thoả nhưng đều thất bại",
                             )
                     except (ValueError, AttributeError):
                         pass
