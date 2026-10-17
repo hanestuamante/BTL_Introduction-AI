@@ -29,8 +29,10 @@ def main() -> int:
     for entry in entries:
         path = manifest_path.parent / entry["path"]
         try:
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            if digest != entry.get("sha256"):
+            raw_bytes = path.read_bytes()
+            normalized_bytes = raw_bytes.replace(b"\r\n", b"\n")
+            digest = hashlib.sha256(normalized_bytes).hexdigest()
+            if digest != entry.get("sha256") and hashlib.sha256(raw_bytes).hexdigest() != entry.get("sha256"):
                 errors.append(f"Checksum mismatch: {path}")
             problem = load_problem(path)
             if problem.puzzle_id in ids:

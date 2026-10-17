@@ -133,7 +133,11 @@ class MainWindow:
         if hasattr(self, "step_divider"):
             self.step_divider.configure(bg=theme["border"])
         if hasattr(self, "step_right_frame"):
-            self.step_right_frame.configure(bg=theme["bg"])
+            self.step_right_frame.configure(
+                bg=theme["bg"],
+                highlightbackground=theme["border"],
+                highlightcolor=theme["border"],
+            )
             is_dfs = self.algorithm.get() == "dfs"
             q_badge_title = "📚 STACK (LIFO)" if is_dfs else "⚡ PRIORITY QUEUE"
             self.queue_badge.configure(
@@ -142,11 +146,90 @@ class MainWindow:
                 fg=theme["badge_fg"],
             )
             self.queue_label.configure(bg=theme["bg"], fg=theme["text_fg"])
+            if hasattr(self, "queue_items_frame"):
+                self.queue_items_frame.configure(bg=theme["bg"])
+            if hasattr(self, "queue_top_indicator"):
+                self.queue_top_indicator.configure(
+                    text="▲ ĐỈNH (TOP)" if is_dfs else "— CUỐI HÀNG ĐỢI —",
+                    bg=theme["bg"],
+                    fg=theme["border"] if is_dfs else "#94a3b8",
+                )
+            if hasattr(self, "queue_bottom_indicator"):
+                self.queue_bottom_indicator.configure(
+                    text="— ĐÁY STACK —" if is_dfs else "▼ ĐẦU (MIN H - POP TIẾP)",
+                    bg=theme["bg"],
+                    fg="#94a3b8" if is_dfs else theme["border"],
+                )
             if frontier_items is not None:
                 if frontier_items:
                     self.queue_text.set("  ".join(frontier_items))
+                    self._render_vertical_frontier(frontier_items, is_dfs, theme)
                 else:
                     self.queue_text.set("[Trống]")
+                    self._render_vertical_frontier((), is_dfs, theme)
+
+    def _render_vertical_frontier(self, items: tuple[str, ...], is_dfs: bool, theme: dict) -> None:
+        if not hasattr(self, "queue_items_frame"):
+            return
+        for child in self.queue_items_frame.winfo_children():
+            if child != self.queue_label:
+                child.destroy()
+        if not items:
+            self.queue_label.configure(text="[Trống]", fg="#94a3b8", bg=theme["bg"])
+            self.queue_label.pack(side="top", fill="x", pady=20)
+            return
+
+        self.queue_label.pack_forget()
+
+        display_items = list(items)
+        if not is_dfs:
+            display_items.reverse()
+
+        max_show = 10
+        if len(display_items) > max_show:
+            truncated = len(display_items) - max_show
+            if is_dfs:
+                visible = display_items[:max_show]
+                extra_note = f"(+ {truncated} phần tử nữa ở đáy)"
+                extra_at_bottom = True
+            else:
+                visible = display_items[-max_show:]
+                extra_note = f"(+ {truncated} phần tử nữa ở trên)"
+                extra_at_bottom = False
+        else:
+            visible = display_items
+            extra_note = None
+            extra_at_bottom = False
+
+        if extra_note and not extra_at_bottom:
+            lbl = tk.Label(self.queue_items_frame, text=extra_note, font=("Segoe UI", 7, "italic"), bg=theme["bg"], fg="#94a3b8")
+            lbl.pack(side="top", fill="x", pady=(0, 2))
+
+        for idx, item in enumerate(visible):
+            is_active_end = (idx == 0 if is_dfs else idx == len(visible) - 1)
+            card = tk.Frame(
+                self.queue_items_frame,
+                bg="#ffffff" if is_active_end else "#f1f5f9",
+                highlightthickness=1,
+                highlightbackground=theme["border"] if is_active_end else "#cbd5e1",
+                padx=4,
+                pady=2,
+            )
+            card.pack(side="top", fill="x", padx=2, pady=2)
+            prefix = "⭐ " if is_active_end else "  "
+            item_lbl = tk.Label(
+                card,
+                text=f"{prefix}{item}",
+                font=("Segoe UI", 8, "bold" if is_active_end else "normal"),
+                bg="#ffffff" if is_active_end else "#f1f5f9",
+                fg=theme["text_fg"] if is_active_end else "#475569",
+                anchor="center",
+            )
+            item_lbl.pack(fill="x")
+
+        if extra_note and extra_at_bottom:
+            lbl = tk.Label(self.queue_items_frame, text=extra_note, font=("Segoe UI", 7, "italic"), bg=theme["bg"], fg="#94a3b8")
+            lbl.pack(side="top", fill="x", pady=(2, 0))
 
     def _set_status(self, message: str, kind: str = "default", frontier_items: tuple[str, ...] | None = None) -> None:
         if self.problem is not None and hasattr(self.problem, "size"):
@@ -182,7 +265,7 @@ class MainWindow:
         self.canvas_host = ttk.Frame(body)
         self.canvas_host.pack(side="left", fill="both", expand=True)
 
-        # Futoshiki Step Card (top of game board)
+        # Futoshiki Step Card (top of game board - instruction only)
         self.step_card = tk.Frame(
             self.canvas_host,
             bg="#f8fafc",
@@ -192,9 +275,9 @@ class MainWindow:
             pady=6,
         )
 
-        # Left side: Instructional step
+        # Instructional step (full width across top)
         self.step_left_frame = tk.Frame(self.step_card, bg="#f8fafc")
-        self.step_left_frame.pack(side="left", fill="both", expand=True, padx=(0, 6))
+        self.step_left_frame.pack(side="left", fill="both", expand=True)
 
         self.step_badge = tk.Label(
             self.step_left_frame,
@@ -215,17 +298,37 @@ class MainWindow:
             fg="#334155",
             anchor="w",
             justify="left",
-            wraplength=320,
+            wraplength=640,
         )
         self.step_label.pack(side="left", fill="both", expand=True)
 
-        # Vertical divider
+        # Keep step_divider for backwards compatibility
         self.step_divider = tk.Frame(self.step_card, bg="#cbd5e1", width=1)
-        self.step_divider.pack(side="left", fill="y", padx=8)
 
-        # Right side: Queue/Stack status
-        self.step_right_frame = tk.Frame(self.step_card, bg="#f8fafc")
-        self.step_right_frame.pack(side="left", fill="both", expand=True, padx=(4, 0))
+        def _on_step_card_resize(event):
+            self.step_label.configure(wraplength=max(200, event.width - 150))
+
+        self.step_card.bind("<Configure>", _on_step_card_resize)
+
+        # Board row: horizontal container for Canvas and Vertical Stack/Priority Queue Frame
+        self.board_row = ttk.Frame(self.canvas_host)
+        self.board_row.pack(side="top", fill="both", expand=True)
+
+        self.canvas = tk.Canvas(self.board_row, background="white", highlightthickness=0)
+        self.canvas.pack(side="left", fill="both", expand=True)
+
+        # Vertical Frame for Stack / Priority Queue (right of game board)
+        self.step_right_frame = tk.Frame(
+            self.board_row,
+            bg="#f8fafc",
+            highlightthickness=2,
+            highlightbackground="#94a3b8",
+            padx=8,
+            pady=8,
+            width=210,
+        )
+        self.step_right_frame.pack_propagate(False)
+        self.step_right_frame.pack(side="right", fill="y", padx=(8, 0))
 
         self.queue_badge = tk.Label(
             self.step_right_frame,
@@ -236,29 +339,40 @@ class MainWindow:
             padx=8,
             pady=3,
         )
-        self.queue_badge.pack(side="left", anchor="n", padx=(0, 8))
+        self.queue_badge.pack(side="top", fill="x", pady=(0, 4))
+
+        self.queue_top_indicator = tk.Label(
+            self.step_right_frame,
+            text="▲ ĐỈNH (TOP)",
+            font=("Segoe UI", 8, "bold"),
+            bg="#f8fafc",
+            fg="#0284c7",
+        )
+        self.queue_top_indicator.pack(side="top", fill="x", pady=(0, 4))
+
+        self.queue_items_frame = tk.Frame(self.step_right_frame, bg="#f8fafc")
+        self.queue_items_frame.pack(side="top", fill="both", expand=True)
 
         self.queue_label = tk.Label(
-            self.step_right_frame,
+            self.queue_items_frame,
             textvariable=self.queue_text,
             font=("Segoe UI", 9, "bold"),
             bg="#f8fafc",
             fg="#334155",
-            anchor="w",
-            justify="left",
-            wraplength=320,
+            anchor="center",
+            justify="center",
+            wraplength=190,
         )
-        self.queue_label.pack(side="left", fill="both", expand=True)
+        self.queue_label.pack(side="top", fill="x", pady=10)
 
-        def _on_queue_frame_resize(event):
-            half = max(140, int(event.width / 2) - 40)
-            self.step_label.configure(wraplength=half)
-            self.queue_label.configure(wraplength=half)
-
-        self.step_card.bind("<Configure>", _on_queue_frame_resize)
-
-        self.canvas = tk.Canvas(self.canvas_host, background="white", highlightthickness=0)
-        self.canvas.pack(fill="both", expand=True)
+        self.queue_bottom_indicator = tk.Label(
+            self.step_right_frame,
+            text="— ĐÁY STACK —",
+            font=("Segoe UI", 8, "bold"),
+            bg="#f8fafc",
+            fg="#94a3b8",
+        )
+        self.queue_bottom_indicator.pack(side="bottom", fill="x", pady=(4, 0))
         side = ttk.Frame(body)
         side.pack(side="right", fill="y", padx=(10, 0))
         self.metrics = MetricsPanel(side)
@@ -302,6 +416,10 @@ class MainWindow:
         if hasattr(self, "queue_badge") and hasattr(self, "problem") and self.problem is not None and hasattr(self.problem, "size"):
             is_dfs = self.algorithm.get() == "dfs"
             self.queue_badge.configure(text="📚 STACK (LIFO)" if is_dfs else "⚡ PRIORITY QUEUE")
+            if hasattr(self, "queue_top_indicator"):
+                self.queue_top_indicator.configure(text="▲ ĐỈNH (TOP)" if is_dfs else "— CUỐI HÀNG ĐỢI —")
+            if hasattr(self, "queue_bottom_indicator"):
+                self.queue_bottom_indicator.configure(text="— ĐÁY STACK —" if is_dfs else "▼ ĐẦU (MIN H - POP TIẾP)")
 
     def browse(self) -> None:
         path = filedialog.askopenfilename(initialdir=ROOT / "data", filetypes=(("JSON puzzle", "*.json"), ("All files", "*")))
@@ -325,7 +443,12 @@ class MainWindow:
         self.solved = False
         self._replace_canvas()
         if hasattr(self.problem, "size"):
-            self.step_card.pack(side="top", fill="x", padx=4, pady=(2, 6), before=self.canvas)
+            if hasattr(self, "board_row"):
+                self.step_card.pack(side="top", fill="x", padx=4, pady=(2, 6), before=self.board_row)
+            else:
+                self.step_card.pack(side="top", fill="x", padx=4, pady=(2, 6), before=self.canvas)
+            if hasattr(self, "step_right_frame"):
+                self.step_right_frame.pack(side="right", fill="y", padx=(8, 0))
             self._update_futoshiki_card("default", f"Futoshiki {self.problem.size}×{self.problem.size}: chọn ô trắng để bắt đầu.", frontier_items=())
             self._build_number_pad(self.problem.size)
             self.help_label.configure(
@@ -337,6 +460,8 @@ class MainWindow:
             self.status.set(FUTOSHIKI_BOTTOM_HINT)
         else:
             self.step_card.pack_forget()
+            if hasattr(self, "step_right_frame"):
+                self.step_right_frame.pack_forget()
             self._build_number_pad(0)
             self.help_label.configure(
                 text="• [Space]: Dừng/Tiếp tục  • [→ / S]: Từng bước\n"
@@ -361,8 +486,9 @@ class MainWindow:
     def _replace_canvas(self) -> None:
         self.canvas.destroy()
         cls = FutoshikiCanvas if hasattr(self.problem, "size") else PipesCanvas
-        self.canvas = cls(self.canvas_host, background="white", highlightthickness=0, takefocus=True)
-        self.canvas.pack(fill="both", expand=True)
+        parent = self.board_row if hasattr(self, "board_row") else self.canvas_host
+        self.canvas = cls(parent, background="white", highlightthickness=0, takefocus=True)
+        self.canvas.pack(side="left", fill="both", expand=True)
         self.canvas.bind("<Configure>", lambda _event: self._draw())
         self.canvas.bind("<Button-1>", self._on_click)
         self.canvas.bind("<Button-2>", lambda event: self._on_click(event, reverse=True))

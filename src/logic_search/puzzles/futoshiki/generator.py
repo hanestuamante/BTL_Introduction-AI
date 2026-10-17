@@ -29,7 +29,14 @@ def count_solutions(problem: FutoshikiProblem, limit: int = 2) -> int:
     return count
 
 
-def generate_futoshiki(size: int, seed: int, *, difficulty: str = "easy") -> dict[str, Any]:
+def generate_futoshiki(
+    size: int,
+    seed: int,
+    *,
+    difficulty: str = "easy",
+    blank_ratio: float | None = None,
+    relation_ratio: float | None = None,
+) -> dict[str, Any]:
     if size < 2:
         raise ValueError("size must be >= 2")
     rng = random.Random(seed)
@@ -48,7 +55,9 @@ def generate_futoshiki(size: int, seed: int, *, difficulty: str = "easy") -> dic
         for col in range(size):
             adjacent.append(((row, col), (row + 1, col)))
     rng.shuffle(adjacent)
-    relation_count = max(size, int(len(adjacent) * {"easy": .35, "medium": .25, "hard": .18}.get(difficulty, .25)))
+    default_rel_ratio = {"easy": .30, "medium": .35, "hard": .45}.get(difficulty, .35)
+    effective_rel_ratio = relation_ratio if relation_ratio is not None else default_rel_ratio
+    relation_count = max(size, int(len(adjacent) * effective_rel_ratio))
     inequalities = []
     for left, right in adjacent[:relation_count]:
         a, b = solution[left[0]][left[1]], solution[right[0]][right[1]]
@@ -56,7 +65,9 @@ def generate_futoshiki(size: int, seed: int, *, difficulty: str = "easy") -> dic
     givens = [row[:] for row in solution]
     positions = list(range(size * size))
     rng.shuffle(positions)
-    target_blanks = int(size * size * {"easy": .45, "medium": .60, "hard": .72}.get(difficulty, .60))
+    default_blank_ratio = {"easy": .60, "medium": .75, "hard": .90}.get(difficulty, .75)
+    effective_blank_ratio = blank_ratio if blank_ratio is not None else default_blank_ratio
+    target_blanks = int(size * size * effective_blank_ratio)
     for position in positions:
         if sum(value == 0 for row in givens for value in row) >= target_blanks:
             break
@@ -81,6 +92,11 @@ def generate_futoshiki(size: int, seed: int, *, difficulty: str = "easy") -> dic
         "size": size,
         "givens": givens,
         "inequalities": inequalities,
-        "metadata": {"generator": "latin-square-v1", "seed": seed, "difficulty": difficulty},
+        "metadata": {
+            "generator": "latin-square-v1",
+            "seed": seed,
+            "difficulty": difficulty,
+            "blank_ratio": effective_blank_ratio,
+        },
     }
 

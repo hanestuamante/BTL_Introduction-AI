@@ -59,30 +59,6 @@ def solve(
         frontier = PriorityFrontier[int]()
         frontier.push(0, initial_h, 0)
     metrics.max_frontier_size = 1
-    emitter.emit(EventType.STARTED, node_id=0, state=problem.initial_state, nodes_generated=1, frontier_size=1, h=initial_h)
-
-    def finish(status: str, message: str = "", node_id: int | None = None) -> SearchResult:
-        now = perf_counter()
-        emitter.accumulated_ms += (now - emitter.last_active) * 1000
-        emitter.last_active = now
-        metrics.runtime_ms = emitter.accumulated_ms
-        path: list[Any] = []
-        actions: list[Any] = []
-        if node_id is not None:
-            path, actions = _reconstruct(nodes, node_id)
-            metrics.solution_depth = nodes[node_id].depth
-            metrics.solution_action_count = len(actions)
-        emitter.emit(
-            EventType.FINISHED,
-            state=path[-1] if path else None,
-            nodes_generated=metrics.nodes_generated,
-            nodes_expanded=metrics.nodes_expanded,
-            nodes_pruned=metrics.nodes_pruned,
-            frontier_size=len(frontier),
-            message=status,
-        )
-        return SearchResult(status, path, actions, metrics, message)
-
     visual_events = detailed_events and on_event is not None
     if visual_events:
         def _get_frontier_items() -> tuple[str, ...]:
@@ -135,6 +111,30 @@ def solve(
             return tuple(items)
 
         emitter.frontier_provider = _get_frontier_items
+
+    emitter.emit(EventType.STARTED, node_id=0, state=problem.initial_state, nodes_generated=1, frontier_size=1, h=initial_h)
+
+    def finish(status: str, message: str = "", node_id: int | None = None) -> SearchResult:
+        now = perf_counter()
+        emitter.accumulated_ms += (now - emitter.last_active) * 1000
+        emitter.last_active = now
+        metrics.runtime_ms = emitter.accumulated_ms
+        path: list[Any] = []
+        actions: list[Any] = []
+        if node_id is not None:
+            path, actions = _reconstruct(nodes, node_id)
+            metrics.solution_depth = nodes[node_id].depth
+            metrics.solution_action_count = len(actions)
+        emitter.emit(
+            EventType.FINISHED,
+            state=path[-1] if path else None,
+            nodes_generated=metrics.nodes_generated,
+            nodes_expanded=metrics.nodes_expanded,
+            nodes_pruned=metrics.nodes_pruned,
+            frontier_size=len(frontier),
+            message=status,
+        )
+        return SearchResult(status, path, actions, metrics, message)
 
     assignment_problem = hasattr(problem, "size") and hasattr(problem, "domain")
     domain_backtracking = visual_events and algorithm == "dfs" and assignment_problem
@@ -282,7 +282,6 @@ def solve(
                 frontier_keys.add(child_key)
                 child_ids.append(child_id)
                 metrics.nodes_generated += 1
-                emitter.emit(EventType.NODE_GENERATED, node_id=child_id, parent_id=node_id, state_key=child_key, state=child_state, action=action, depth=node.depth + 1, h=h)
             if not child_ids:
                 metrics.nodes_pruned += 1
                 if visual_events and not valid_actions and assignment_problem:
@@ -350,6 +349,23 @@ def solve(
                     child = nodes[child_id]
                     frontier.push(child_id, child.h, child.depth)
             metrics.max_frontier_size = max(metrics.max_frontier_size, len(frontier))
+
+            for child_id in child_ids:
+                child = nodes[child_id]
+                emitter.emit(
+                    EventType.NODE_GENERATED,
+                    node_id=child_id,
+                    parent_id=node_id,
+                    state_key=problem.state_key(child.state),
+                    state=child.state,
+                    action=child.action,
+                    depth=child.depth,
+                    h=child.h,
+                    nodes_generated=metrics.nodes_generated,
+                    nodes_expanded=metrics.nodes_expanded,
+                    nodes_pruned=metrics.nodes_pruned,
+                    frontier_size=len(frontier),
+                )
             last_expanded_id = node_id
             last_had_no_children = (len(child_ids) == 0)
 
