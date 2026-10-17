@@ -152,13 +152,9 @@ class FutoshikiProblem:
     def heuristic(self, state: FutoshikiState) -> float:
         domains = [self.domain(state, i) for i, value in enumerate(state) if value == 0]
         empty = sum(not domain for domain in domains)
-        risk = 0
-        for left, op, right in self.inequalities:
-            if state[left] and state[right]:
-                continue
-            left_values = self.domain(state, left) if not state[left] else (state[left],)
-            right_values = self.domain(state, right) if not state[right] else (state[right],)
-            feasible = sum((a < b if op == "<" else a > b) for a in left_values for b in right_values)
-            risk += int(0 < feasible <= 2)
-        return 1000 * empty + 10 * risk + sum(max(0, len(d) - 1) for d in domains) + len(domains)
+        if empty:
+            return 1000.0 * empty
+        singletons = sum(len(d) == 1 for d in domains)
+        slack = sum(max(0, len(d) - 1) for d in domains)
+        return float(4 * len(domains) + slack - 2 * singletons)
 

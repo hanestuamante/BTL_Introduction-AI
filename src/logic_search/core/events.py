@@ -64,10 +64,10 @@ class EventEmitter:
             EventType.BACKTRACK,
         }:
             return
-        if "frontier_items" not in kwargs and self.frontier_provider is not None:
-            kwargs["frontier_items"] = self.frontier_provider()
         now = perf_counter()
         self.accumulated_ms += (now - self.last_active) * 1000
+        if "frontier_items" not in kwargs and self.frontier_provider is not None:
+            kwargs["frontier_items"] = self.frontier_provider()
         event = SearchEvent(event_type, self.accumulated_ms, **kwargs)
         try:
             self.callback(event)

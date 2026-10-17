@@ -60,9 +60,16 @@ def solve(
         frontier.push(0, initial_h, 0)
     metrics.max_frontier_size = 1
     visual_events = detailed_events and on_event is not None
+    cached_frontier: tuple[str, ...] = ()
+    frontier_dirty = True
     if visual_events:
         def _get_frontier_items() -> tuple[str, ...]:
+            nonlocal cached_frontier, frontier_dirty
+            if not frontier_dirty:
+                return cached_frontier
             if not len(frontier):
+                cached_frontier = ()
+                frontier_dirty = False
                 return ()
             items: list[str] = []
             if algorithm == "dfs":
@@ -108,7 +115,9 @@ def solve(
                         items.append(f"[gốc, h={h_str}]")
                     else:
                         items.append(f"[{act}, h={h_str}]")
-            return tuple(items)
+            cached_frontier = tuple(items)
+            frontier_dirty = False
+            return cached_frontier
 
         emitter.frontier_provider = _get_frontier_items
 
@@ -153,6 +162,7 @@ def solve(
                 node_id = frontier.pop()
             else:
                 _priority, node_id = frontier.pop()
+            frontier_dirty = True
             node = nodes[node_id]
             key = problem.state_key(node.state)
             frontier_keys.discard(key)
@@ -348,6 +358,8 @@ def solve(
                 for child_id in child_ids:
                     child = nodes[child_id]
                     frontier.push(child_id, child.h, child.depth)
+            if child_ids:
+                frontier_dirty = True
             metrics.max_frontier_size = max(metrics.max_frontier_size, len(frontier))
 
             for child_id in child_ids:
