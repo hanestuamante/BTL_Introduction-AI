@@ -20,24 +20,24 @@ class MetricsPanel(ttk.LabelFrame):
 
     def update_event(self, event) -> None:
         finish_map = {
-            "solved": "Đã tìm thấy nghiệm",
-            "Frontier exhausted": "Hàng đợi rỗng",
-            "Search cancelled": "Đã hủy tìm kiếm",
-            "timeout": "Hết thời gian",
+            "solved": "Solution found",
+            "Frontier exhausted": "Frontier exhausted",
+            "Search cancelled": "Search cancelled",
+            "timeout": "Timed out",
         }
         finish_text = finish_map.get(event.message, event.message)
         labels = {
-            EventType.STARTED: "Đang tìm kiếm",
-            EventType.NODE_GENERATED: "Đã tạo node chờ xét",
-            EventType.NODE_EXPANDED: "Đang mở rộng node",
-            EventType.NODE_PRUNED: "Không sinh nhánh con mới",
-            EventType.GOAL_FOUND: "Đã tìm thấy nghiệm",
-            EventType.FINISHED: f"Kết thúc: {finish_text}",
-            EventType.ERROR: "Lỗi tìm kiếm",
-            EventType.CELL_DOMAIN: "Đang xét miền giá trị",
-            EventType.VALUE_TRIED: "Đang thử giá trị",
-            EventType.VALUE_REJECTED: "Đã loại giá trị",
-            EventType.BACKTRACK: "Đang quay lui",
+            EventType.STARTED: "Searching",
+            EventType.NODE_GENERATED: "Node generated for exploration",
+            EventType.NODE_EXPANDED: "Expanding node",
+            EventType.NODE_PRUNED: "No new children generated",
+            EventType.GOAL_FOUND: "Solution found",
+            EventType.FINISHED: f"Finished: {finish_text}",
+            EventType.ERROR: "Search error",
+            EventType.CELL_DOMAIN: "Checking domain",
+            EventType.VALUE_TRIED: "Trying value",
+            EventType.VALUE_REJECTED: "Value rejected",
+            EventType.BACKTRACK: "Backtracking",
         }
         self.variables["status"].set(labels[event.type])
         elapsed = (f"{event.elapsed_ms / 1000.0:.2f} s" if event.elapsed_ms >= 1000.0
@@ -47,13 +47,13 @@ class MetricsPanel(ttk.LabelFrame):
             self._previous_node_id = None
             for name in self.FIELDS[3:]:
                 self.variables[name].set("0")
-            self.variables["transition"].set("Node gốc")
+            self.variables["transition"].set("Root node")
         if event.type == EventType.NODE_EXPANDED:
             switched = self._previous_node_id is not None and event.parent_id != self._previous_node_id
-            self.variables["transition"].set("Chuyển nhánh xét" if switched else "Tiếp tục mở rộng")
+            self.variables["transition"].set("Switching branches" if switched else "Continuing expansion")
             self._previous_node_id = event.node_id
         if event.type == EventType.NODE_PRUNED:
-            self.variables["transition"].set("Ngõ cụt" if event.message == "No valid actions" else "Nhánh con đã được khám phá")
+            self.variables["transition"].set("Dead end" if event.message == "No valid actions" else "Child branches already discovered")
         if event.type in {EventType.STARTED, EventType.NODE_EXPANDED, EventType.NODE_PRUNED, EventType.FINISHED}:
             for field, value in (("generated", event.nodes_generated), ("expanded", event.nodes_expanded), ("pruned", event.nodes_pruned), ("frontier", event.frontier_size)):
                 self.variables[field].set(str(value))

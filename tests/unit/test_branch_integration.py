@@ -115,9 +115,9 @@ def test_futoshiki_solver_micro_events_preserve_search_results(algorithm):
     events_with_frontier = [e for e in events if e.frontier_items is not None and len(e.frontier_items) > 0]
     assert len(events_with_frontier) > 0
     if algorithm == "dfs":
-        assert any(all(item.startswith("[ô(") and "h=" not in item for item in e.frontier_items) for e in events_with_frontier)
+        assert any(all(item.startswith("[cell(") and "h=" not in item for item in e.frontier_items) for e in events_with_frontier)
     else:
-        assert any(all(item.startswith("[ô(") and "h=" in item for item in e.frontier_items) for e in events_with_frontier)
+        assert any(all(item.startswith("[cell(") and "h=" in item for item in e.frontier_items) for e in events_with_frontier)
     assert [e.type for e in plain_events] == [EventType.STARTED, EventType.GOAL_FOUND, EventType.FINISHED]
     for field in ("nodes_expanded", "nodes_generated", "nodes_pruned", "duplicate_states"):
         assert getattr(visual.metrics, field) == getattr(plain.metrics, field)
@@ -231,34 +231,34 @@ def test_futoshiki_step_card_updates_and_pipes_fallback():
     window.algorithm = DummyVar("dfs")
 
     window.problem = futoshiki_problem
-    window._set_status("Xét ô hàng 1, cột 2", kind="domain", frontier_items=("[ô(1,2)=3]", "[ô(1,2)=2]"))
-    assert window.futoshiki_step_text.get() == "Xét ô hàng 1, cột 2"
+    window._set_status("Checking cell at row 1, column 2", kind="domain", frontier_items=("[cell(1,2)=3]", "[cell(1,2)=2]"))
+    assert window.futoshiki_step_text.get() == "Checking cell at row 1, column 2"
     assert window.step_card.config["highlightbackground"] == "#0284c7"
-    assert window.step_badge.config["text"] == "🔍 XÉT GIÁ TRỊ THOẢ"
-    assert window.queue_badge.config["text"] == "📚 STACK (LIFO)"
-    assert window.queue_text.get() == "[ô(1,2)=3]  [ô(1,2)=2]"
+    assert window.step_badge.config["text"] == "CHECK DOMAIN"
+    assert window.queue_badge.config["text"] == "STACK (LIFO)"
+    assert window.queue_text.get() == "[cell(1,2)=3]  [cell(1,2)=2]"
 
-    window._set_status("Thử điền 3", kind="trial")
-    assert window.futoshiki_step_text.get() == "Thử điền 3"
+    window._set_status("Trying value 3", kind="trial")
+    assert window.futoshiki_step_text.get() == "Trying value 3"
     assert window.step_card.config["highlightbackground"] == "#d97706"
-    assert window.step_badge.config["text"] == "⚡ ĐANG THỬ"
+    assert window.step_badge.config["text"] == "TRYING VALUE"
 
     window.algorithm.set("gbfs")
     window._on_algorithm_change()
-    assert window.queue_badge.config["text"] == "⚡ PRIORITY QUEUE"
+    assert window.queue_badge.config["text"] == "PRIORITY QUEUE"
 
-    window._set_status("Loại 3", kind="rejected", frontier_items=("[ô(1,2)=3, h=1]",))
-    assert window.futoshiki_step_text.get() == "Loại 3"
+    window._set_status("Rejecting value 3", kind="rejected", frontier_items=("[cell(1,2)=3, h=1]",))
+    assert window.futoshiki_step_text.get() == "Rejecting value 3"
     assert window.step_card.config["highlightbackground"] == "#dc2626"
-    assert window.step_badge.config["text"] == "❌ LOẠI BỎ"
-    assert window.queue_badge.config["text"] == "⚡ PRIORITY QUEUE"
-    assert window.queue_text.get() == "[ô(1,2)=3, h=1]"
+    assert window.step_badge.config["text"] == "REJECTED"
+    assert window.queue_badge.config["text"] == "PRIORITY QUEUE"
+    assert window.queue_text.get() == "[cell(1,2)=3, h=1]"
 
-    window._set_status("Hoàn thành", kind="solved", frontier_items=())
-    assert window.queue_text.get() == "[Trống]"
+    window._set_status("Complete", kind="solved", frontier_items=())
+    assert window.queue_text.get() == "[Empty]"
 
     window.problem = pipes_problem
-    window._set_status("Đã xoay ống", kind="info")
-    assert window.status.get() == "Đã xoay ống"
+    window._set_status("Pipe rotated", kind="info")
+    assert window.status.get() == "Pipe rotated"
 
 

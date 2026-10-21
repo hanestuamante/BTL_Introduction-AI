@@ -84,7 +84,7 @@ class FutoshikiProblem:
                 state=state,
                 cell=index,
                 domain=domain_values,
-                message=f"Xét ô hàng {r + 1}, cột {c + 1}: các giá trị có thể thoả là {{{', '.join(map(str, domain_values))}}}",
+                message=f"Checking cell at row {r + 1}, column {c + 1}: candidate values are {{{', '.join(map(str, domain_values))}}}",
                 **kwargs,
             )
         if not domain_values:
@@ -95,7 +95,7 @@ class FutoshikiProblem:
                     cell=index,
                     domain=tuple(range(1, self.size + 1)),
                     reason="empty_domain",
-                    message=f"Ô hàng {r + 1}, cột {c + 1} không còn số hợp lệ nào",
+                    message=f"No valid values remain for the cell at row {r + 1}, column {c + 1}",
                     **kwargs,
                 )
             return ()
@@ -111,7 +111,7 @@ class FutoshikiProblem:
                     value=value,
                     domain=domain_values,
                     action=(index, value),
-                    message=f"Thử điền {value} vào ô hàng {r + 1}, cột {c + 1}",
+                    message=f"Trying {value} in the cell at row {r + 1}, column {c + 1}",
                     **kwargs,
                 )
             if self.is_consistent(candidate):
@@ -126,7 +126,7 @@ class FutoshikiProblem:
                         domain=domain_values,
                         action=(index, value),
                         reason="conflict",
-                        message=f"Loại {value} tại ô hàng {r + 1}, cột {c + 1} (vi phạm ràng buộc)",
+                        message=f"Rejecting {value} at row {r + 1}, column {c + 1} (constraint violation)",
                         **kwargs,
                     )
         return actions
