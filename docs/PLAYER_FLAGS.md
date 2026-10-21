@@ -17,8 +17,11 @@ không phụ thuộc font hay emoji.
 - Cờ thể hiện nhận định của người chơi; chương trình không xác nhận ô đó đúng.
 - Cờ không khóa ô và không ràng buộc thuật toán. Khi xoay ống hoặc dùng
   Hint đổi hướng của ô, cờ trên ô đó tự bỏ; cờ ở các ô khác được giữ nguyên.
-- Với Pipes, **Ctrl + bấm trái** chỉ chọn ô, không xoay. Dùng **Q/E** để xoay
-  ngược/thuận chiều kim đồng hồ. Quy tắc ô khóa của đề vẫn được giữ nguyên.
+- Rê chuột lên ô rồi dùng **Q/E** để xoay ô đó ngược/thuận chiều kim đồng hồ.
+  Không cần bấm chọn ô; thao tác giữ nguyên ô đang chọn. Ngoài bàn chơi,
+  Q/E không tác động. Quy tắc ô khóa của đề vẫn được giữ nguyên.
+- **Ctrl + bấm trái** chỉ chọn ô. Các nút **Rotate CCW (Q)** và
+  **Rotate CW (E)** trên thanh công cụ xoay ô đang chọn.
 - **Undo** khôi phục cả trạng thái ô và các cờ, kể cả thao tác gắn/bỏ/xóa cờ.
 - Load, Reset hoặc bắt đầu lượt tìm kiếm mới sẽ xóa cờ. Hãy hủy lượt tìm kiếm
   trước khi chỉnh ghi chú thủ công.
@@ -36,7 +39,7 @@ không phụ thuộc font hay emoji.
 | Gắn/bỏ cờ ô dưới con trỏ | F hoặc Shift+bấm trái |
 | Xóa tất cả cờ | Ctrl+Shift+F |
 | Chọn ô Pipes mà không xoay | Ctrl+bấm trái |
-| Xoay Pipes ngược/thuận chiều kim đồng hồ | Q / E |
+| Xoay ô dưới con trỏ ngược/thuận chiều kim đồng hồ | Q / E |
 | Run | Enter |
 | Pause/Resume | Space |
 | Step | S hoặc mũi tên phải |

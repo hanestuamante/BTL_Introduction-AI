@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from logic_search.puzzles.futoshiki.model import FutoshikiProblem
-from logic_search.puzzles.pipes.model import E, N, S, W, PipesProblem
+from logic_search.puzzles.pipes.model import E, N, S, W, PipesProblem, rotate_mask
 from logic_search.ui.controller import SearchController
 from logic_search.ui.futoshiki_canvas import FutoshikiCanvas
 from logic_search.ui.game_logic import initial_play_state
@@ -179,6 +179,48 @@ def test_shift_click_flags_without_changing_the_selected_pipe(window):
     assert window.flags == {2} and window.selected == 0
 
 
+@pytest.mark.parametrize('key,turns', [('q', -1), ('e', 1)])
+def test_qe_rotate_the_hovered_pipe_and_undo_restores_its_flag(window, key, turns):
+    window.toggle_flag(0)
+    window.toggle_flag(2)
+    before = window.current_state
+    window.canvas.winfo_pointerxy = lambda: (150, 250)
+    window.canvas.winfo_rootx = lambda: 100
+    window.canvas.winfo_rooty = lambda: 200
+    window.canvas.cell_at = lambda x, y: 2 if (x, y) == (50, 50) else None
+    event = SimpleNamespace(keysym=key, char=key, state=0, widget=object())
+    assert window._on_key(event) == 'break'
+    expected = list(before)
+    expected[2] = rotate_mask(before[2], turns)
+    assert window.current_state == tuple(expected)
+    assert window.selected == 0 and window.flags == {0}
+    window.back()
+    assert window.current_state == before and window.flags == {0, 2}
+
+
+def test_pointer_rotation_works_without_selecting_a_cell(window):
+    window.selected = None
+    window._pipe_under_pointer = lambda: 2
+    before = window.current_state
+    window.rotate_pipe_under_pointer(1)
+    assert window.current_state[2] == rotate_mask(before[2], 1)
+    assert window.selected is None
+
+
+@pytest.mark.parametrize('blocked', ['outside', 'locked', 'search'])
+def test_pointer_rotation_respects_board_bounds_locks_and_running_search(window, blocked):
+    window._pipe_under_pointer = lambda: None if blocked == 'outside' else 2
+    if blocked == 'locked':
+        window.problem = replace(window.problem, locked_mask=(0, 0, window.current_state[2], 0))
+    if blocked == 'search':
+        window.controller.state.running = True
+    window.flags = {2}
+    before, history_length = window.current_state, len(window.history)
+    window.rotate_pipe_under_pointer(1)
+    assert window.current_state == before and len(window.history) == history_length
+    assert window.flags == {2} and window.selected == 0
+
+
 def test_flags_do_not_override_puzzle_locks(window):
     window.problem = replace(window.problem, locked_mask=(E, 0, 0, 0))
     window.toggle_flag()
@@ -227,13 +269,13 @@ def test_pipes_canvas_draws_vector_flag_without_a_unicode_glyph(window):
     ('F', 5, 'clear_flags'), ('z', 4, 'back'), ('r', 4, 'reset'),
     ('o', 4, 'browse'), ('l', 4, 'load'), ('Return', 0, 'run'),
     ('space', 0, 'toggle_pause'), ('Right', 0, 'step'), ('s', 0, 'step'),
-    ('Escape', 0, 'cancel_search'), ('q', 0, 'rotate_selected_pipe'),
-    ('e', 0, 'rotate_selected_pipe'), ('a', 0, 'cycle_algorithm'),
+    ('Escape', 0, 'cancel_search'), ('q', 0, 'rotate_pipe_under_pointer'),
+    ('e', 0, 'rotate_pipe_under_pointer'), ('a', 0, 'cycle_algorithm'),
     ('plus', 1, 'change_speed'), ('minus', 0, 'change_speed'),
 ])
 def test_shortcuts_dispatch_exactly_once(window, key, modifiers, expected):
     calls = []
-    actions = set(BUTTON_SHORTCUTS) | {'toggle_pause', 'rotate_selected_pipe', 'cycle_algorithm', 'change_speed', 'flag_under_pointer'}
+    actions = set(BUTTON_SHORTCUTS) | {'toggle_pause', 'rotate_selected_pipe', 'cycle_algorithm', 'change_speed', 'flag_under_pointer', 'rotate_pipe_under_pointer'}
     for name in actions:
         setattr(window, name, lambda *args, _name=name: calls.append((_name, args)))
     event = SimpleNamespace(keysym=key, state=modifiers, widget=object(), char='')
@@ -245,7 +287,7 @@ def test_shortcuts_dispatch_exactly_once(window, key, modifiers, expected):
 def test_shortcuts_preserve_typing_and_native_undo_in_entries(window):
     from tkinter import ttk
     entry = object.__new__(ttk.Entry)
-    for key, modifiers in [('c', 0), ('f', 0), ('space', 0), ('Return', 0), ('z', 4), ('r', 4), ('F', 5)]:
+    for key, modifiers in [('c', 0), ('f', 0), ('space', 0), ('Return', 0), ('z', 4), ('r', 4), ('F', 5), ('q', 0), ('e', 0)]:
         assert window._on_key(SimpleNamespace(keysym=key, state=modifiers, widget=entry, char=key)) is None
     assert not window.flags
 

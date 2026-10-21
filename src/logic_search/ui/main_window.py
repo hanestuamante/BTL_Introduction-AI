@@ -551,7 +551,7 @@ class MainWindow:
                      "- Match every pipe end; the network must be a tree\n"
                      "- Dashed orange border: locked cell\n"
                      "- Red dot: source; blue pipes: water\n"
-                     "- Q/E: rotate selected pipe\n"
+                     "- Hover + Q/E: rotate pipe\n"
                      "- Hover + F or Shift+click: flag/unflag\n"
                      "- Ctrl+click: select without rotating\n"
                      "- Purple flags are your notes"
@@ -649,11 +649,16 @@ class MainWindow:
                 self.flag_target = index
                 self._update_flag_controls()
 
+    def _pipe_under_pointer(self) -> int | None:
+        if not self._is_pipes():
+            return None
+        x, y = self.canvas.winfo_pointerxy()
+        return self.canvas.cell_at(x - self.canvas.winfo_rootx(), y - self.canvas.winfo_rooty())
+
     def flag_under_pointer(self) -> None:
         if not self._is_pipes():
             return
-        x, y = self.canvas.winfo_pointerxy()
-        index = self.canvas.cell_at(x - self.canvas.winfo_rootx(), y - self.canvas.winfo_rooty())
+        index = self._pipe_under_pointer()
         if index is None:
             self._set_status("Move the pointer over a pipe and press F to flag it.", kind="warning")
             return
@@ -697,20 +702,32 @@ class MainWindow:
         self._draw()
 
     def rotate_selected_pipe(self, turns: int) -> None:
+        self._rotate_pipe_at(self.selected, turns)
+
+    def rotate_pipe_under_pointer(self, turns: int) -> None:
+        if not self._is_pipes():
+            return
+        index = self._pipe_under_pointer()
+        if index is None:
+            self._set_status("Move the pointer over a pipe and press Q/E to rotate it.", kind="warning")
+            return
+        self._rotate_pipe_at(index, turns)
+
+    def _rotate_pipe_at(self, index: int | None, turns: int) -> None:
         if self.problem is None or hasattr(self.problem, "size") or self.current_state is None:
             return
         if self._search_busy():
             self._set_status("Cancel the search before rotating pipes manually.", kind="warning")
             return
-        if self.selected is None:
+        if index is None:
             self._set_status("Select a pipe with Ctrl+click before rotating it.", kind="warning")
             return
-        if self.problem.is_locked(self.selected):
+        if self.problem.is_locked(index):
             self._set_status("This cell is locked and cannot be rotated.", kind="warning")
             self._draw()
             return
         self._clear_domain_state()
-        self._remember(rotate_pipe(self.problem, self.current_state, self.selected, turns))
+        self._remember(rotate_pipe(self.problem, self.current_state, index, turns))
         self._set_status("Pipe rotated. Press 'Check (C)' when the network is fully connected.", kind="info")
 
     def _remember(self, new_state: tuple[int, ...]) -> None:
@@ -822,7 +839,7 @@ class MainWindow:
                 "space": self.toggle_pause, "right": self.step, "s": self.step,
                 "return": self.run, "kp_enter": self.run, "escape": self.cancel_search,
                 "c": self.check, "h": self.hint, "f": self.flag_under_pointer,
-                "q": lambda: self.rotate_selected_pipe(-1), "e": lambda: self.rotate_selected_pipe(1),
+                "q": lambda: self.rotate_pipe_under_pointer(-1), "e": lambda: self.rotate_pipe_under_pointer(1),
                 "a": self.cycle_algorithm,
                 "plus": lambda: self.change_speed(0.25), "equal": lambda: self.change_speed(0.25),
                 "kp_add": lambda: self.change_speed(0.25), "minus": lambda: self.change_speed(-0.25),
