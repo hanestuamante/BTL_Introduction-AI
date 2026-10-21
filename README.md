@@ -4,13 +4,64 @@ Giải và trực quan hóa Pipes, Futoshiki bằng DFS và Greedy Best-First Se
 
 ## 1. Cài đặt
 
-Yêu cầu Python 3.11 trở lên; Python cần có Tkinter để mở GUI. Chạy các lệnh dưới đây tại thư mục gốc dự án.
+Yêu cầu Python 3.11 trở lên. Chạy các lệnh dưới đây tại thư mục gốc dự án. Dùng một môi trường riêng để tránh chọn nhầm Python hoặc cài dependencies vào interpreter khác.
+
+Linux/macOS (thay `python3.11` bằng interpreter ≥3.11 bạn đã cài):
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+```
+
+Windows PowerShell:
+
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -e '.[dev]'
+```
+
+Hoặc dùng Conda với cấu hình được lưu trong repository, bao gồm Python 3.11 và Tk:
+
+```bash
+conda env create -f environment-dev.yml
+conda activate logic-puzzle-search
+```
+
+Nếu đã có môi trường Python ≥3.11 phù hợp, chỉ cần:
 
 ```bash
 python -m pip install -e '.[dev]'
 ```
 
 `pyproject.toml` khai báo gói, phiên bản Python, dependencies và lệnh `logic-search`. `requirements-dev.txt` cài cùng bộ dependencies phát triển qua `python -m pip install -r requirements-dev.txt`.
+
+### Kiểm tra interpreter và Tkinter
+
+```bash
+python -c "import sys; print(sys.executable, sys.version); assert sys.version_info >= (3, 11)"
+python -m pytest --version
+python -c "import tkinter; print('Tk', tkinter.TkVersion)"
+```
+
+Tkinter cần cho GUI **và toàn bộ suite tests**, vì một số test nhập các lớp canvas/cửa sổ. Các test này không mở cửa sổ và không cần display. Import các module logic chơi, controller và dùng CLI không cần Tk. Việc mở GUI cần thêm display hoạt động; `python -m tkinter` dùng để thử cửa sổ Tk trên máy desktop.
+
+Tkinter thường đi cùng Python trên Windows/macOS; trên Linux cần cài gói Tk tương ứng với đúng interpreter qua trình quản lý gói hệ thống hoặc dùng môi trường Conda ở trên. Nếu gặp `No module named pytest`, kiểm tra đã kích hoạt đúng môi trường và cài `.[dev]`. Nếu gặp lỗi thiếu `_tkinter` hoặc `libtk8.6.so`, sửa bộ cài Python/Tk và đường dẫn thư viện của môi trường; virtualenv không tự bổ sung thư viện Tk của hệ điều hành.
+
+Các file `environment.yml` và thư mục `env/` cục bộ không phải cấu hình phát hành. Dùng `environment-dev.yml`; không dùng môi trường Python 3.10 cho project này.
+
+### Kiểm tra nhanh sau khi cài
+
+```bash
+python -m logic_search --help
+python -m logic_search solve --puzzle futoshiki \
+  --input data/futoshiki/futoshiki-4x4-easy-seed-201.json --algorithm gbfs
+python -m pytest -q
+python scripts/validate_submission.py
+```
+
+Lệnh solve cần trả `status: solved`; validator cần báo `Validated 18 unique, checksummed inputs`. Số test phụ thuộc commit đang chạy. Benchmark đầy đủ gồm nhiều process và có thể mất nhiều phút; generator và các lệnh benchmark ghi lại file đầu ra nếu trùng đường dẫn, nên chọn thư mục riêng khi chỉ chạy thử.
 
 ## 2. Kiến trúc và cách sử dụng các file
 
@@ -70,6 +121,8 @@ Các file ngoài mã nguồn:
 | `results/tables/summary.csv` | Số lượt, tỷ lệ thành công, số mẫu memory, median/mean/stdev/min/max theo puzzle, kích thước, độ khó, thuật toán. |
 | `results/charts/runtime.svg`, `results/charts/memory.svg`, `results/charts/nodes.svg` | Mở bằng trình duyệt để xem biểu đồ thời gian, bộ nhớ và node mở rộng. |
 | `docs/ADR-001.md` | Tài liệu quyết định kiến trúc. |
+| `docs/ADR-002.md` | Sự kiện tìm kiếm, phát lại và cách tính thời gian GUI. |
+| `environment-dev.yml` | Môi trường Conda Python 3.11, Tk và dependencies phát triển. |
 | `slides/README.md` | Hướng dẫn nội dung slide. |
 | `LICENSE` | Giấy phép sử dụng mã nguồn. |
 
@@ -250,11 +303,35 @@ python -m pytest tests/integration -q
 
 `-q` giảm thông tin in ra; đối số đường dẫn chọn file hoặc thư mục tests cần chạy.
 
+Nếu máy không có Tk, có thể chạy phần core/CLI/benchmark sau; đây là **một phần suite**, không thay thế kiểm tra đầy đủ:
+
+```bash
+python -m pytest tests/unit/test_futoshiki.py tests/unit/test_pipes.py \
+  tests/unit/test_search.py tests/unit/test_summary.py \
+  tests/unit/test_benchmark_metadata.py tests/unit/test_ui_imports.py \
+  tests/integration -q
+```
+
+Để đo coverage sau khi cài `.[dev]`:
+
+```bash
+python -m pytest --cov=logic_search --cov-branch --cov-report=term-missing
+```
+
+Coverage cấu hình cho toàn bộ package, kể cả model, parser, GUI và benchmark. Các worker benchmark dùng process spawn riêng; không mặc nhiên coi code trong process con đã được công cụ coverage theo dõi. Phần GUI kiểm tra bằng đối tượng giả chưa thay thế được thử tương tác cửa sổ thực tế.
+
 | File | Nội dung kiểm tra |
 | --- | --- |
 | `tests/unit/test_pipes.py` | Phép xoay, ràng buộc, parser và generator Pipes. |
-| `tests/unit/test_futoshiki.py` | Miền giá trị, bất đẳng thức, parser và generator Futoshiki. |
+| `tests/unit/test_futoshiki.py` | Miền giá trị, bất đẳng thức, parser, nghiệm giữ nguyên givens và event Futoshiki. |
 | `tests/unit/test_search.py` | DFS, GBFS, frontier, event và hủy tìm kiếm. |
-| `tests/unit/test_game_logic.py` | Thao tác chơi, xung đột và gợi ý. |
+| `tests/unit/test_game_logic.py` | Thao tác chơi, xung đột và gợi ý Futoshiki liên tiếp/sau Reset. |
+| `tests/unit/test_branch_integration.py` | Kết hợp puzzle, sự kiện, canvas, timeout loại thời gian callback và controller. |
+| `tests/unit/test_player_flags_shortcuts.py` | Cờ, hoàn tác và phím tắt Pipes. |
+| `tests/unit/test_metrics_panel.py` | Giữ số đo và depth khi nhận các loại sự kiện khác nhau. |
+| `tests/unit/test_summary.py` | Tách nhóm kích thước và không đếm lặp mẫu memory. |
+| `tests/unit/test_benchmark_metadata.py` | Commit, trạng thái working tree và checksum nguồn khi mã thay đổi. |
+| `tests/unit/test_ui_imports.py` | Import logic chơi/controller khi Tkinter không có sẵn. |
 | `tests/integration/test_end_to_end.py` | Giải đề và kiểm tra nghiệm đầu cuối. |
 | `tests/integration/test_benchmark.py` | Chạy benchmark và kiểm tra dữ liệu xuất. |
+| `tests/integration/test_cli.py` | Mã thoát và lỗi input khi tile/op có kiểu hoặc giá trị không hợp lệ. |
