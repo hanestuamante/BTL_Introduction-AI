@@ -140,7 +140,7 @@ python -m logic_search solve \
   --output results/raw/example.json
 
 python -m logic_search solve \
-  --puzzle pipes --input data/pipes/pipes-6x6-hard-wrap-seed-601.json \
+  --puzzle pipes --input data/pipes/pipes-5x5-hard-wrap-seed-501.json \
   --algorithm dfs
 ```
 
@@ -258,30 +258,32 @@ python scripts/generate_pipes_inputs.py \
 
 Manifest đầu ra liệt kê đợt vừa sinh. Khi sinh nhiều mức, dùng `--count` không quá 100 để tránh trùng dải seed.
 
-## 6. Số liệu kết quả lịch sử — commit được ghi nhận `7a80ea9`
+## 6. Số liệu kết quả — bộ 21 đề
 
-Bảng dưới đây và các biểu đồ trong `results/charts/` thuộc đợt đo ghi commit `7a80ea9`, **không phải benchmark của phiên bản code hiện tại**. Solver và heuristic đã thay đổi sau commit đó. Raw cũ không lưu trạng thái working tree hoặc checksum mã nguồn, nên commit không chứng minh toàn bộ nội dung mã đã chạy. Xem [nguồn gốc bộ kết quả](results/README.md).
+Đã đo lại toàn bộ **21 đề × 2 thuật toán × 10 lượt = 420 lượt timing**, với **420/420 lượt giải thành công**. Bộ dữ liệu gồm 9 đề Futoshiki và 12 đề Pipes Hard nối biên 5×5–8×8. Mã được đo tại commit `054bb6fcd89823e54273ced470de5ef2e05c2594`; package Python có SHA-256 `1de4e7d1eb5db91538f95b6402361eefab6c4ac81661faba0ee841d8c65ec8e1`. Các lượt đo ghi `git_worktree_dirty=false`; commit tài liệu/kết quả sau đó không thay đổi package đã đo.
 
-Số liệu lấy từ `results/tables/summary.csv`: 18 đề × 2 thuật toán × 10 lượt = **360 lượt timing**, tất cả giải thành công. Mỗi cặp đề/thuật toán có 1 lượt warm-up, 10 lượt timing và 1 lượt memory riêng; mỗi nhóm dưới đây có 30 lượt timing và 3 mẫu memory.
+Mỗi cặp đề/thuật toán có 1 warm-up, 10 timing và 1 memory riêng trong process tách biệt, timeout 60 giây mỗi lượt. Tổng cộng 42 warm-up, 420 timing và 42 memory; **42/42 lượt memory thành công**. Mỗi nhóm trong bảng có 30 timing và tối đa 3 mẫu memory độc lập. Ba seed là 3 đề độc lập; 10 lượt lặp mỗi seed đo dao động thời gian, không biến thành 30 đề độc lập.
 
-Thời gian và node là median trên các lượt giải thành công. Memory là median của peak cấp phát Python trong `solve()`, đo bằng `tracemalloc` sau khi nạp input. Thông tin máy và phiên bản Python của từng lượt nằm trong raw results.
+Thời gian và node là median trên timing solved. Memory là median peak cấp phát Python trong `solve()`, đo bằng `tracemalloc` sau khi nạp input; không phải RSS. Memory thất bại được loại khỏi mẫu memory và giữ nguyên trạng thái trong raw. Nguồn dữ liệu: [raw CSV](results/raw/benchmark.csv), [raw JSON](results/raw/benchmark.json), [summary](results/tables/summary.csv). [Nguồn gốc và bộ lịch sử](results/README.md); [báo cáo kiểm tra sau cập nhật](docs/VERIFICATION.md).
 
-Các lượt benchmark mới ghi thêm full commit, `git_worktree_dirty`, `source_sha256` của các file Python trong package, `manifest_sha256`, `input_sha256`, `benchmark_timeout_s` và `benchmark_repeats`. CLI tính hash từ chính manifest đã đọc; API `run_benchmark` không được truyền hash manifest ghi `unknown`. Metadata lấy Git của thư mục mã nguồn thay vì Git của thư mục gọi lệnh. Để đánh giá phiên bản hiện tại, chốt code rồi chạy benchmark vào thư mục mới và tổng hợp lại; mỗi nhóm chỉ có 3 đề độc lập, không phải 30 đề.
+Các bản ghi có full commit, trạng thái Git, `source_sha256`, `manifest_sha256`, `input_sha256`, `benchmark_timeout_s` và `benchmark_repeats`. API không được truyền hash manifest ghi `unknown`; CLI tính hash từ đúng bytes đã đọc. Bộ 360 lượt cũ tại commit được ghi nhận `7a80ea9` được giữ nguyên trong `results/archive/7a80ea9/`, không trộn vào số liệu mới.
 
 | Puzzle | Kích thước | Độ khó | Thuật toán | Solved / lượt | Median thời gian (ms) | Median memory (KiB) | Median node mở rộng |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: |
-| Futoshiki | 4x4 | Easy | DFS | 30/30 | 0.35 | 8.33 | 8 |
-| Futoshiki | 4x4 | Easy | GBFS | 30/30 | 0.53 | 8.60 | 8 |
-| Futoshiki | 5x5 | Medium | DFS | 30/30 | 1.04 | 15.11 | 16 |
-| Futoshiki | 5x5 | Medium | GBFS | 30/30 | 3.00 | 15.85 | 16 |
-| Futoshiki | 6x6 | Hard | DFS | 30/30 | 4.83 | 37.12 | 53 |
-| Futoshiki | 6x6 | Hard | GBFS | 30/30 | 17.31 | 61.31 | 89 |
-| Pipes | 6x6 | Hard | DFS | 30/30 | 861.29 | 252.32 | 420 |
-| Pipes | 6x6 | Hard | GBFS | 30/30 | 932.91 | 269.10 | 434 |
-| Pipes | 7x7 | Hard | DFS | 30/30 | 2667.55 | 701.83 | 1098 |
-| Pipes | 7x7 | Hard | GBFS | 30/30 | 3843.91 | 1028.31 | 1421 |
-| Pipes | 8x8 | Hard | DFS | 30/30 | 6956.70 | 1505.78 | 1904 |
-| Pipes | 8x8 | Hard | GBFS | 30/30 | 11247.38 | 2131.80 | 2689 |
+| Futoshiki | 4x4 | Easy | DFS | 30/30 | 0.40 | 8.71 | 8 |
+| Futoshiki | 4x4 | Easy | GBFS | 30/30 | 0.54 | 8.95 | 8 |
+| Futoshiki | 5x5 | Medium | DFS | 30/30 | 1.11 | 15.22 | 16 |
+| Futoshiki | 5x5 | Medium | GBFS | 30/30 | 2.45 | 17.71 | 20 |
+| Futoshiki | 6x6 | Hard | DFS | 30/30 | 5.04 | 37.33 | 53 |
+| Futoshiki | 6x6 | Hard | GBFS | 30/30 | 5.78 | 31.51 | 38 |
+| Pipes | 5x5 | Hard | DFS | 30/30 | 304.40 | 122.46 | 268 |
+| Pipes | 5x5 | Hard | GBFS | 30/30 | 322.50 | 123.60 | 249 |
+| Pipes | 6x6 | Hard | DFS | 30/30 | 852.96 | 251.33 | 420 |
+| Pipes | 6x6 | Hard | GBFS | 30/30 | 929.19 | 268.13 | 434 |
+| Pipes | 7x7 | Hard | DFS | 30/30 | 2642.87 | 700.81 | 1098 |
+| Pipes | 7x7 | Hard | GBFS | 30/30 | 3861.51 | 1027.31 | 1421 |
+| Pipes | 8x8 | Hard | DFS | 30/30 | 6958.31 | 1504.75 | 1904 |
+| Pipes | 8x8 | Hard | GBFS | 30/30 | 11240.70 | 2130.86 | 2689 |
 
 ## 7. Kiểm tra dữ liệu và chạy tests
 
@@ -307,7 +309,7 @@ Nếu máy không có Tk, có thể chạy phần core/CLI/benchmark sau; đây 
 
 ```bash
 python -m pytest tests/unit/test_futoshiki.py tests/unit/test_pipes.py \
-  tests/unit/test_search.py tests/unit/test_summary.py \
+  tests/unit/test_search.py tests/unit/test_summary.py tests/unit/test_dataset.py \
   tests/unit/test_benchmark_metadata.py tests/unit/test_ui_imports.py \
   tests/integration -q
 ```
