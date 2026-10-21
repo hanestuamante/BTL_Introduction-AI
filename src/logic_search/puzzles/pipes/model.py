@@ -39,7 +39,7 @@ class PipesProblem:
     def source_index(self) -> int:
         if self.source is not None:
             return self.source
-        return (self.rows // 2) * self.cols + (self.cols // 2)
+        return 0
 
     @property
     def initial_state(self) -> PipesState:
