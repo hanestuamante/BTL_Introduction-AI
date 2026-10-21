@@ -7,7 +7,12 @@ không phụ thuộc font hay emoji.
 
 ## Gắn cờ
 
-- Chọn ô rồi bấm **Flag (F)**, hoặc dùng **Shift + bấm trái** trực tiếp vào ô.
+- Rê con trỏ chuột lên ô rồi nhấn **F** để gắn/bỏ cờ cho ô dưới con trỏ,
+  không cần bấm chọn ô. Thao tác này giữ nguyên ô đang chọn để xoay.
+- **Shift + bấm trái** cũng gắn/bỏ cờ trực tiếp vào ô được bấm.
+- Nút **Flag (F)** / **Unflag (F)** trên thanh công cụ áp dụng cho ô vừa
+  được rê chuột qua, để vẫn bấm được nút sau khi rời bàn chơi.
+- Nhấn **F** khi con trỏ ở ngoài bàn chơi sẽ không gắn cờ vào ô cũ.
 - Thực hiện lại để bỏ cờ.
 - Cờ thể hiện nhận định của người chơi; chương trình không xác nhận ô đó đúng.
 - Cờ không khóa ô và không ràng buộc thuật toán. Khi xoay ống hoặc dùng
@@ -28,7 +33,7 @@ không phụ thuộc font hay emoji.
 | Hint | H |
 | Undo | Ctrl+Z |
 | Reset | Ctrl+R |
-| Gắn/bỏ cờ ô đang chọn | F hoặc Shift+bấm trái |
+| Gắn/bỏ cờ ô dưới con trỏ | F hoặc Shift+bấm trái |
 | Xóa tất cả cờ | Ctrl+Shift+F |
 | Chọn ô Pipes mà không xoay | Ctrl+bấm trái |
 | Xoay Pipes ngược/thuận chiều kim đồng hồ | Q / E |

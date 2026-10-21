@@ -33,6 +33,7 @@ def window():
     instance.flags = set()
     instance.flag_history = [set()]
     instance.selected = 0
+    instance.flag_target = 0
     instance.solved = False
     instance.conflicts = set()
     instance.cell_domains, instance.cell_rejected = {}, {}
@@ -63,7 +64,7 @@ def test_flags_are_player_notes_even_for_an_incorrect_orientation(window):
 
 def test_undo_restores_flag_edits_and_clear_all(window):
     window.toggle_flag()
-    window.selected = 2
+    window.flag_target = 2
     window.toggle_flag()
     window.clear_flags()
     assert not window.flags
@@ -77,7 +78,7 @@ def test_undo_restores_flag_edits_and_clear_all(window):
 
 def test_rotation_clears_only_the_changed_flag_and_undo_restores_it(window):
     window.toggle_flag()
-    window.selected = 2
+    window.flag_target = 2
     window.toggle_flag()
     window.selected = 0
     before = window.current_state
@@ -91,7 +92,7 @@ def test_hint_clears_changed_flag_and_keeps_other_notes(window):
     solution = window.current_state
     window._remember((S, S | W, E, N | W))
     window.toggle_flag()
-    window.selected = 2
+    window.flag_target = 2
     window.toggle_flag()
     window.solution = solution
     window.hint()
@@ -129,6 +130,53 @@ def test_shift_click_flags_and_control_click_selects_without_rotating(window):
     assert window.selected == 0 and window.flags == {0} and window.current_state == before
     window._on_click(SimpleNamespace(x=0, y=0, state=1))
     assert not window.flags and window.current_state == before
+
+
+def test_f_flags_the_pipe_under_the_pointer_without_changing_the_selected_pipe(window):
+    before = window.current_state
+    window.canvas.winfo_pointerxy = lambda: (150, 250)
+    window.canvas.winfo_rootx = lambda: 100
+    window.canvas.winfo_rooty = lambda: 200
+    window.canvas.cell_at = lambda x, y: 2 if (x, y) == (50, 50) else None
+    window.active_cell = 1
+    event = SimpleNamespace(keysym='f', state=0, widget=object(), char='f')
+    assert window._on_key(event) == 'break'
+    assert window.flags == {2} and window.selected == 0 and window.active_cell == 1
+    assert window.current_state == before
+    window.flag_under_pointer()
+    assert not window.flags and window.selected == 0
+
+
+def test_f_can_flag_a_hovered_pipe_before_any_cell_is_selected(window):
+    window.selected = None
+    window.canvas.winfo_pointerxy = lambda: (50, 50)
+    window.canvas.winfo_rootx = window.canvas.winfo_rooty = lambda: 0
+    window.canvas.cell_at = lambda x, y: 1
+    window.flag_under_pointer()
+    assert window.flags == {1} and window.selected is None
+
+
+def test_f_outside_the_board_does_not_fall_back_to_a_previous_target(window):
+    before = len(window.history)
+    window.canvas.winfo_pointerxy = lambda: (-10, -10)
+    window.canvas.winfo_rootx = window.canvas.winfo_rooty = lambda: 0
+    window.canvas.cell_at = lambda x, y: None
+    window.flag_under_pointer()
+    assert not window.flags and len(window.history) == before
+
+
+def test_flag_button_uses_the_last_hovered_pipe_when_the_pointer_leaves_the_board(window):
+    window.canvas.cell_at = lambda x, y: 2 if x >= 0 else None
+    window._on_pipe_hover(SimpleNamespace(x=20, y=20))
+    window._on_pipe_hover(SimpleNamespace(x=-10, y=20))
+    window.toggle_flag()
+    assert window.flags == {2} and window.selected == 0
+
+
+def test_shift_click_flags_without_changing_the_selected_pipe(window):
+    window.canvas.cell_at = lambda x, y: 2
+    window._on_click(SimpleNamespace(x=20, y=20, state=1))
+    assert window.flags == {2} and window.selected == 0
 
 
 def test_flags_do_not_override_puzzle_locks(window):
@@ -175,7 +223,7 @@ def test_pipes_canvas_draws_vector_flag_without_a_unicode_glyph(window):
 
 
 @pytest.mark.parametrize('key,modifiers,expected', [
-    ('c', 0, 'check'), ('h', 0, 'hint'), ('f', 0, 'toggle_flag'),
+    ('c', 0, 'check'), ('h', 0, 'hint'), ('f', 0, 'flag_under_pointer'),
     ('F', 5, 'clear_flags'), ('z', 4, 'back'), ('r', 4, 'reset'),
     ('o', 4, 'browse'), ('l', 4, 'load'), ('Return', 0, 'run'),
     ('space', 0, 'toggle_pause'), ('Right', 0, 'step'), ('s', 0, 'step'),
@@ -185,7 +233,7 @@ def test_pipes_canvas_draws_vector_flag_without_a_unicode_glyph(window):
 ])
 def test_shortcuts_dispatch_exactly_once(window, key, modifiers, expected):
     calls = []
-    actions = set(BUTTON_SHORTCUTS) | {'toggle_pause', 'rotate_selected_pipe', 'cycle_algorithm', 'change_speed'}
+    actions = set(BUTTON_SHORTCUTS) | {'toggle_pause', 'rotate_selected_pipe', 'cycle_algorithm', 'change_speed', 'flag_under_pointer'}
     for name in actions:
         setattr(window, name, lambda *args, _name=name: calls.append((_name, args)))
     event = SimpleNamespace(keysym=key, state=modifiers, widget=object(), char='')

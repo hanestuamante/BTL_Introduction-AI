@@ -102,6 +102,7 @@ class MainWindow:
         self.history: list[tuple[int, ...]] = []
         self.flags: set[int] = set()
         self.flag_history: list[set[int]] = []
+        self.flag_target: int | None = None
         self.selected: int | None = None
         self.active_cell: int | None = None
         self.active_kind: str | None = None
@@ -513,6 +514,7 @@ class MainWindow:
         self.history = [self.current_state]
         self.flags = set()
         self.flag_history = [set()]
+        self.flag_target = None
         self.selected = None
         self._clear_domain_state()
         self.conflicts = set()
@@ -550,7 +552,7 @@ class MainWindow:
                      "- Dashed orange border: locked cell\n"
                      "- Red dot: source; blue pipes: water\n"
                      "- Q/E: rotate selected pipe\n"
-                     "- F or Shift+click: flag/unflag\n"
+                     "- Hover + F or Shift+click: flag/unflag\n"
                      "- Ctrl+click: select without rotating\n"
                      "- Purple flags are your notes"
             )
@@ -581,6 +583,9 @@ class MainWindow:
         self.canvas.bind("<Button-1>", self._on_click)
         self.canvas.bind("<Button-2>", lambda event: self._on_click(event, reverse=True))
         self.canvas.bind("<Button-3>", lambda event: self._on_click(event, reverse=True))
+        if self._is_pipes():
+            self.canvas.bind("<Motion>", self._on_pipe_hover)
+            self.canvas.bind("<Enter>", self._on_pipe_hover)
         self._install_shortcuts(self.canvas)
 
     def _draw(self) -> None:
@@ -618,10 +623,11 @@ class MainWindow:
             return
         flags = getattr(self, "flags", set())
         busy = self._search_busy()
-        selected = self.selected is not None and self.current_state is not None and bool(self.current_state[self.selected])
+        target = self.flag_target
+        can_flag = target is not None and self.current_state is not None and bool(self.current_state[target])
         self.flag_button.configure(
-            text=action_label("Unflag" if self.selected in flags else "Flag", "toggle_flag"),
-            state="normal" if selected and not busy else "disabled",
+            text=action_label("Unflag" if target in flags else "Flag", "toggle_flag"),
+            state="normal" if can_flag and not busy else "disabled",
         )
         self.clear_flags_button.configure(state="normal" if flags and not busy else "disabled")
         self.flag_count.set(f"Flags: {len(flags)} (your notes)")
@@ -636,24 +642,45 @@ class MainWindow:
         self.history.append(state)
         self.flag_history.append(set(getattr(self, "flags", set())))
 
-    def toggle_flag(self) -> None:
+    def _on_pipe_hover(self, event) -> None:
+        if self._is_pipes():
+            index = self.canvas.cell_at(event.x, event.y)
+            if index is not None:
+                self.flag_target = index
+                self._update_flag_controls()
+
+    def flag_under_pointer(self) -> None:
+        if not self._is_pipes():
+            return
+        x, y = self.canvas.winfo_pointerxy()
+        index = self.canvas.cell_at(x - self.canvas.winfo_rootx(), y - self.canvas.winfo_rooty())
+        if index is None:
+            self._set_status("Move the pointer over a pipe and press F to flag it.", kind="warning")
+            return
+        self.flag_target = index
+        self.toggle_flag(index)
+
+    def toggle_flag(self, index: int | None = None) -> None:
         if not self._is_pipes():
             return
         if self._search_busy():
             self._set_status("Cancel the search before editing player flags.", kind="warning")
             return
-        if self.current_state is None or self.selected is None:
-            self._set_status("Select a cell first. Shift+click can flag a cell directly.", kind="warning")
+        # The toolbar uses the last hovered pipe when the pointer moves onto it.
+        if index is None:
+            index = self.flag_target
+        if self.current_state is None or index is None:
+            self._set_status("Hover over a pipe first. Press F or Shift+click to flag it.", kind="warning")
             return
-        if not self.current_state[self.selected]:
+        if not self.current_state[index]:
             self._set_status("Reset the board before flagging an unassigned pipe.", kind="warning")
             self._draw()
             return
-        if self.selected in self.flags:
-            self.flags.remove(self.selected)
+        if index in self.flags:
+            self.flags.remove(index)
             message = "Player flag removed."
         else:
-            self.flags.add(self.selected)
+            self.flags.add(index)
             message = "Player flag added. This is your note, not a verified answer."
         self._append_history(self.current_state)
         self._set_status(message, kind="info")
@@ -703,12 +730,14 @@ class MainWindow:
         index = self.canvas.cell_at(event.x, event.y)
         if index is None:
             return
+        modifiers = getattr(event, "state", 0)
+        if self._is_pipes():
+            self.flag_target = index
+            if modifiers & 0x0001:
+                self.toggle_flag(index)
+                return
         self._clear_domain_state()
         self.selected = index
-        modifiers = getattr(event, "state", 0)
-        if self._is_pipes() and modifiers & 0x0001:
-            self.toggle_flag()
-            return
         if self._is_pipes() and modifiers & 0x0004:
             self._draw()
             return
@@ -792,7 +821,7 @@ class MainWindow:
             action = {
                 "space": self.toggle_pause, "right": self.step, "s": self.step,
                 "return": self.run, "kp_enter": self.run, "escape": self.cancel_search,
-                "c": self.check, "h": self.hint, "f": self.toggle_flag,
+                "c": self.check, "h": self.hint, "f": self.flag_under_pointer,
                 "q": lambda: self.rotate_selected_pipe(-1), "e": lambda: self.rotate_selected_pipe(1),
                 "a": self.cycle_algorithm,
                 "plus": lambda: self.change_speed(0.25), "equal": lambda: self.change_speed(0.25),
@@ -959,6 +988,7 @@ class MainWindow:
             self.history = [self.current_state]
             self.flags = set()
             self.flag_history = [set()]
+            self.flag_target = None
             self.selected = None
             self._clear_domain_state()
             self.conflicts = set()
