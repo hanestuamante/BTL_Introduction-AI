@@ -99,7 +99,7 @@ def main() -> int:
     previous = json.loads(manifest_path.read_text()) if manifest_path.exists() else {"inputs": []}
     retained = [entry for entry in previous["inputs"] if entry["path"].startswith("futoshiki/")] if args.pipes_only else []
     generated = []
-    for size in (6, 7, 8):
+    for size in (5, 6, 7, 8):
         for offset in range(3):
             seed = size * 100 + 1 + offset
             data = generate_pipes(size, size, seed, difficulty="hard", wrap=True, candidates=24)

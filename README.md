@@ -61,7 +61,7 @@ python -m pytest -q
 python scripts/validate_submission.py
 ```
 
-Lệnh solve cần trả `status: solved`; validator cần báo `Validated 18 unique, checksummed inputs`. Số test phụ thuộc commit đang chạy. Benchmark đầy đủ gồm nhiều process và có thể mất nhiều phút; generator và các lệnh benchmark ghi lại file đầu ra nếu trùng đường dẫn, nên chọn thư mục riêng khi chỉ chạy thử.
+Lệnh solve cần trả `status: solved`; validator cần báo `Validated 21 unique, checksummed inputs`. Số test phụ thuộc commit đang chạy. Benchmark đầy đủ gồm nhiều process và có thể mất nhiều phút; generator và các lệnh benchmark ghi lại file đầu ra nếu trùng đường dẫn, nên chọn thư mục riêng khi chỉ chạy thử.
 
 ## 2. Kiến trúc và cách sử dụng các file
 
@@ -112,9 +112,9 @@ Các file ngoài mã nguồn:
 | `scripts/run_benchmarks.py` | Chạy cấu hình benchmark mặc định; xem mục 4. |
 | `scripts/summarize_results.py` | Tổng hợp CSV và vẽ biểu đồ; xem mục 4. |
 | `scripts/validate_submission.py` | Kiểm tra manifest, checksum, ID và nghiệm duy nhất; xem mục 7. |
-| `data/benchmark_manifest.json` | Danh sách 18 đề chính, đường dẫn tương đối và checksum SHA-256; truyền vào `--manifest`. |
+| `data/benchmark_manifest.json` | Danh sách 21 đề chính, đường dẫn tương đối và checksum SHA-256; truyền vào `--manifest`. |
 | `data/futoshiki/*.json` | 9 đề Futoshiki: 4×4 Easy, 5×5 Medium, 6×6 Hard; mỗi nhóm 3 đề. Dùng với `solve --puzzle futoshiki` hoặc GUI. |
-| `data/pipes/*.json` | 9 đề Pipes Hard nối biên: 6×6, 7×7, 8×8; mỗi kích thước 3 đề. Dùng với `solve --puzzle pipes` hoặc GUI. |
+| `data/pipes/*.json` | 12 đề Pipes Hard nối biên: 5×5, 6×6, 7×7, 8×8; mỗi kích thước 3 đề. Dùng với `solve --puzzle pipes` hoặc GUI. |
 | `data/generated-pipes-wrap/benchmark_manifest.json` | Manifest bộ Pipes Hard 6×6 nối biên, tỷ lệ khóa tối thiểu 0,15; dùng với `benchmark --manifest`. |
 | `data/generated-pipes-wrap/pipes/*.json` | 3 đề với seed 242–244; dùng với CLI/GUI. |
 | `results/raw/benchmark.csv`, `results/raw/benchmark.json` | Số đo từng lượt chạy và thông tin môi trường. |
@@ -174,7 +174,7 @@ Lệnh chỉ có `-h` / `--help`, không có flag cấu hình. Khi mở, GUI n�
 | Từng bước / Hủy | Phát từng event hoặc hủy tìm kiếm. |
 | Tốc độ | Điều chỉnh tốc độ hiển thị từ `0.25` đến `4.0`. |
 
-Riêng trò Pipes, cờ đánh dấu do người chơi tự đặt và các phím tắt mới được mô tả trong [hướng dẫn cờ đánh dấu và phím tắt](docs/PLAYER_FLAGS.md). Cờ không xác nhận ô đúng và không ràng buộc thuật toán.
+Riêng trò Pipes, cờ đánh dấu do người chơi tự đặt và các phím tắt mới được mô tả trong [hướng dẫn cờ đánh dấu và phím tắt](docs/PLAYER_FLAGS.md). Cờ không xác nhận ô đúng và không ràng buộc thuật toán. Nguồn nước mặc định ở hàng 1, cột 1 (góc trên bên trái); file JSON có thể chỉ định nguồn riêng qua `source`.
 
 ## 4. Benchmark và tổng hợp kết quả
 
@@ -231,7 +231,7 @@ python scripts/generate_inputs.py
 | `--output` | Thư mục | `data` tại gốc dự án | Lưu các đề và `benchmark_manifest.json`. |
 | `--pipes-only` | Bật/tắt | Tắt | Chọn chế độ sinh bộ Pipes. |
 
-Cấu hình bộ chính: Pipes Hard nối biên 6×6, 7×7, 8×8 với seed 601–603, 701–703, 801–803; Futoshiki 4×4 Easy, 5×5 Medium, 6×6 Hard với seed 201–203, 301–303, 401–403. Script ghi lại các đề và manifest tại thư mục đầu ra.
+Cấu hình bộ chính: Pipes Hard nối biên 5×5, 6×6, 7×7, 8×8 với seed 501–503, 601–603, 701–703, 801–803; Futoshiki 4×4 Easy, 5×5 Medium, 6×6 Hard với seed 201–203, 301–303, 401–403. Script ghi lại các đề và manifest tại thư mục đầu ra.
 
 ### `scripts/generate_pipes_inputs.py`
 
@@ -291,7 +291,7 @@ Các lượt benchmark mới ghi thêm full commit, `git_worktree_dirty`, `sourc
 python scripts/validate_submission.py
 ```
 
-Script không có flags; đọc `data/benchmark_manifest.json`, kiểm tra ít nhất 18 đề, checksum, ID không trùng và đúng một nghiệm. Mã thoát `0` khi hợp lệ, `1` khi có lỗi.
+Script không có flags; đọc `data/benchmark_manifest.json`, kiểm tra ít nhất 21 đề, đủ tối thiểu 3 đề cho mỗi nhóm puzzle/kích thước/độ khó chuẩn, checksum, ID không trùng và đúng một nghiệm. Mã thoát `0` khi hợp lệ, `1` khi có lỗi.
 
 ### Các file kiểm thử
 
@@ -322,6 +322,7 @@ Coverage cấu hình cho toàn bộ package, kể cả model, parser, GUI và be
 
 | File | Nội dung kiểm tra |
 | --- | --- |
+| `tests/unit/test_dataset.py` | Checksum, cấu hình và nghiệm duy nhất của ba đề Pipes 5×5. |
 | `tests/unit/test_pipes.py` | Phép xoay, ràng buộc, parser và generator Pipes. |
 | `tests/unit/test_futoshiki.py` | Miền giá trị, bất đẳng thức, parser, nghiệm giữ nguyên givens và event Futoshiki. |
 | `tests/unit/test_search.py` | DFS, GBFS, frontier, event và hủy tìm kiếm. |

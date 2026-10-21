@@ -8,7 +8,13 @@ from logic_search.search.solver import solve
 ROOT = Path(__file__).resolve().parents[2]
 
 
-@pytest.mark.parametrize("relative", ["data/futoshiki/futoshiki-4x4-easy-seed-201.json", "data/pipes/pipes-6x6-hard-wrap-seed-601.json"])
+@pytest.mark.parametrize("relative", [
+    "data/futoshiki/futoshiki-4x4-easy-seed-201.json",
+    "data/pipes/pipes-5x5-hard-wrap-seed-501.json",
+    "data/pipes/pipes-5x5-hard-wrap-seed-502.json",
+    "data/pipes/pipes-5x5-hard-wrap-seed-503.json",
+    "data/pipes/pipes-6x6-hard-wrap-seed-601.json",
+])
 @pytest.mark.parametrize("algorithm", ["dfs", "gbfs"])
 def test_solver_handles_sample_inputs(relative, algorithm):
     problem = load_problem(ROOT / relative)

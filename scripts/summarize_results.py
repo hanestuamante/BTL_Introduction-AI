@@ -52,7 +52,7 @@ def write_csv(path: Path, rows: list[dict[str, str]]) -> None:
 
 def write_svg(path: Path, rows: list[dict[str, str]], metric: str, title: str) -> None:
     values = [float(row[metric]) if row.get(metric) else None for row in rows]
-    width, height, margin = 1000, 520, 70
+    width, height, margin = max(1000, len(rows) * 90 + 140), 520, 70
     chart_h = height - 2 * margin
     max_value = max((value for value in values if value is not None), default=1) or 1
     bar_w = (width - 2 * margin) / max(1, len(rows))
