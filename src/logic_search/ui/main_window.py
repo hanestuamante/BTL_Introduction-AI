@@ -19,6 +19,17 @@ DEFAULT_INPUT = ROOT / "data/futoshiki/futoshiki-4x4-easy-seed-201.json"
 
 FUTOSHIKI_BOTTOM_HINT = "Shortcuts: [Enter] Run - [Space] Pause/Resume - [Right / S] Step - [Esc] Cancel - Click a cell and enter 1-N"
 
+BUTTON_SHORTCUTS = {
+    "browse": "Ctrl+O", "load": "Ctrl+L", "check": "C", "hint": "H",
+    "back": "Ctrl+Z", "reset": "Ctrl+R", "toggle_flag": "F", "clear_flags": "Ctrl+Shift+F",
+    "run": "Enter", "pause_search": "Space", "resume_search": "Space",
+    "step": "S / Right", "cancel_search": "Esc",
+}
+
+
+def action_label(text: str, action: str) -> str:
+    return f"{text} ({BUTTON_SHORTCUTS[action]})"
+
 CARD_THEMES = {
     "domain": {
         "bg": "#f0f9ff",
@@ -89,6 +100,8 @@ class MainWindow:
         self.problem = None
         self.current_state: tuple[int, ...] | None = None
         self.history: list[tuple[int, ...]] = []
+        self.flags: set[int] = set()
+        self.flag_history: list[set[int]] = []
         self.selected: int | None = None
         self.active_cell: int | None = None
         self.active_kind: str | None = None
@@ -106,7 +119,12 @@ class MainWindow:
         self.futoshiki_step_text = tk.StringVar(value="Ready: select a white cell to begin.")
         self.queue_text = tk.StringVar(value="[Empty]")
         self._build()
-        self.root.bind("<Key>", self._on_key)
+        self._shortcut_tag = f"LogicSearchShortcuts{id(self)}"
+        self._shortcut_keys_down: set[str] = set()
+        self.root.bind_class(self._shortcut_tag, "<KeyPress>", self._on_key)
+        self.root.bind_class(self._shortcut_tag, "<KeyRelease>", self._on_key_release)
+        self._install_shortcuts(self.root)
+        self.root.bind("<Key>", self._on_futoshiki_key)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.root.after(30, self._poll)
         self.load()
@@ -257,8 +275,10 @@ class MainWindow:
         top = ttk.LabelFrame(self.root, text="Puzzle", padding=8)
         top.pack(fill="x", padx=10, pady=(10, 5))
         ttk.Entry(top, textvariable=self.input_path).pack(side="left", fill="x", expand=True, padx=(0, 6))
-        ttk.Button(top, text="Browse...", command=self.browse).pack(side="left")
-        ttk.Button(top, text="Load", command=self.load).pack(side="left", padx=(6, 0))
+        self.browse_button = ttk.Button(top, text="Browse...", command=self.browse)
+        self.browse_button.pack(side="left")
+        self.load_button = ttk.Button(top, text="Load", command=self.load)
+        self.load_button.pack(side="left", padx=(6, 0))
 
         body = ttk.Frame(self.root, padding=(10, 5))
         body.pack(fill="both", expand=True)
@@ -382,21 +402,79 @@ class MainWindow:
         self.help_label = ttk.Label(help_box, text="", justify="left", wraplength=220)
         self.help_label.pack(anchor="w")
 
-        play = ttk.LabelFrame(self.root, text="Play", padding=8)
-        play.pack(fill="x", padx=10, pady=5)
-        for text, command in (("Check", self.check), ("Hint", self.hint), ("Undo", self.back), ("Reset", self.reset)):
-            ttk.Button(play, text=text, command=command).pack(side="left", padx=3)
-        ttk.Separator(play, orient="vertical").pack(side="left", fill="y", padx=10)
-        ttk.Label(play, text="Number:").pack(side="left")
-        self.number_pad = ttk.Frame(play)
-        self.number_pad.pack(side="left", padx=4)
+        self.play_controls = ttk.LabelFrame(self.root, text="Play", padding=8)
+        self.play_controls.pack(fill="x", padx=10, pady=5)
+        self.search_controls = ttk.LabelFrame(self.root, text="Search visualization", padding=8)
+        self.search_controls.pack(fill="x", padx=10, pady=5)
+        self._build_controls()
 
-        search = ttk.LabelFrame(self.root, text="Search visualization", padding=8)
-        search.pack(fill="x", padx=10, pady=5)
-        ttk.Label(search, text="Algorithm:").pack(side="left")
-        combo = ttk.Combobox(search, textvariable=self.algorithm, values=("dfs", "gbfs"), state="readonly", width=7)
+        status_bar = ttk.Frame(self.root, padding=(12, 5, 12, 10))
+        status_bar.pack(fill="x")
+        ttk.Label(status_bar, textvariable=self.status, anchor="w").pack(fill="x")
+
+    def _is_pipes(self) -> bool:
+        return self.problem is not None and not hasattr(self.problem, "size")
+
+    def _build_controls(self) -> None:
+        for panel in (self.play_controls, self.search_controls):
+            for child in panel.winfo_children():
+                child.destroy()
+        play, search = self.play_controls, self.search_controls
+        pipes = self._is_pipes()
+        self.browse_button.configure(text=action_label("Browse", "browse") if pipes else "Browse...")
+        self.load_button.configure(text=action_label("Load", "load") if pipes else "Load")
+        if not pipes:
+            for text, command in (("Check", self.check), ("Hint", self.hint), ("Undo", self.back), ("Reset", self.reset)):
+                ttk.Button(play, text=text, command=command).pack(side="left", padx=3)
+            ttk.Separator(play, orient="vertical").pack(side="left", fill="y", padx=10)
+            ttk.Label(play, text="Number:").pack(side="left")
+            self.number_pad = ttk.Frame(play)
+            self.number_pad.pack(side="left", padx=4)
+
+            ttk.Label(search, text="Algorithm:").pack(side="left")
+            combo = ttk.Combobox(search, textvariable=self.algorithm, values=("dfs", "gbfs"), state="readonly", width=7)
+            combo.pack(side="left", padx=5)
+            combo.bind("<<ComboboxSelected>>", lambda _e: self._on_algorithm_change())
+            for text, command in (
+                ("Run", self.run),
+                ("Pause", self.pause_search),
+                ("Resume", self.resume_search),
+                ("Step", self.step),
+                ("Cancel", self.cancel_search),
+            ):
+                ttk.Button(search, text=text, command=command).pack(side="left", padx=2)
+            ttk.Label(search, text="Speed:").pack(side="left", padx=(12, 2))
+            ttk.Scale(search, from_=0.25, to=4.0, variable=self.speed, orient="horizontal", length=140).pack(side="left")
+
+            return
+        actions = ttk.Frame(play)
+        actions.pack(fill="x")
+        for text, command in (("Check", self.check), ("Hint", self.hint), ("Undo", self.back), ("Reset", self.reset)):
+            ttk.Button(actions, text=action_label(text, command.__name__), command=command).pack(side="left", padx=3)
+        self.flag_button = ttk.Button(actions, text=action_label("Flag", "toggle_flag"), command=self.toggle_flag)
+        self.flag_button.pack(side="left", padx=3)
+        self.clear_flags_button = ttk.Button(actions, text=action_label("Clear flags", "clear_flags"), command=self.clear_flags)
+        self.clear_flags_button.pack(side="left", padx=3)
+        inputs = ttk.Frame(play)
+        inputs.pack(fill="x", pady=(5, 0))
+        self.input_label = ttk.Label(inputs, text="Number:")
+        self.input_label.pack(side="left")
+        self.number_pad = ttk.Frame(inputs)
+        self.number_pad.pack(side="left", padx=4)
+        self.flag_count = tk.StringVar(value="Flags: 0 (your notes)")
+        ttk.Label(inputs, textvariable=self.flag_count).pack(side="right", padx=4)
+
+        settings = ttk.Frame(search)
+        settings.pack(fill="x")
+        ttk.Label(settings, text="Algorithm (A):").pack(side="left")
+        combo = ttk.Combobox(settings, textvariable=self.algorithm, values=("dfs", "gbfs"), state="readonly", width=7)
+        self.algorithm_combo = combo
         combo.pack(side="left", padx=5)
         combo.bind("<<ComboboxSelected>>", lambda _e: self._on_algorithm_change())
+        ttk.Label(settings, text="Speed (+/-):").pack(side="left", padx=(12, 2))
+        ttk.Scale(settings, from_=0.25, to=4.0, variable=self.speed, orient="horizontal", length=140).pack(side="left")
+        controls = ttk.Frame(search)
+        controls.pack(fill="x", pady=(5, 0))
         for text, command in (
             ("Run", self.run),
             ("Pause", self.pause_search),
@@ -404,13 +482,10 @@ class MainWindow:
             ("Step", self.step),
             ("Cancel", self.cancel_search),
         ):
-            ttk.Button(search, text=text, command=command).pack(side="left", padx=2)
-        ttk.Label(search, text="Speed:").pack(side="left", padx=(12, 2))
-        ttk.Scale(search, from_=0.25, to=4.0, variable=self.speed, orient="horizontal", length=140).pack(side="left")
+            ttk.Button(controls, text=action_label(text, command.__name__), command=command).pack(side="left", padx=2)
 
-        status_bar = ttk.Frame(self.root, padding=(12, 5, 12, 10))
-        status_bar.pack(fill="x")
-        ttk.Label(status_bar, textvariable=self.status, anchor="w").pack(fill="x")
+        self._install_shortcuts(play)
+        self._install_shortcuts(search)
 
     def _on_algorithm_change(self) -> None:
         if hasattr(self, "queue_badge") and hasattr(self, "problem") and self.problem is not None and hasattr(self.problem, "size"):
@@ -436,11 +511,15 @@ class MainWindow:
             return
         self.current_state = initial_play_state(self.problem)
         self.history = [self.current_state]
+        self.flags = set()
+        self.flag_history = [set()]
         self.selected = None
         self._clear_domain_state()
         self.conflicts = set()
         self.solution = None
         self.solved = False
+        self._shortcut_keys_down.clear()
+        self._build_controls()
         self._replace_canvas()
         if hasattr(self.problem, "size"):
             if hasattr(self, "board_row"):
@@ -469,7 +548,11 @@ class MainWindow:
                      "- Left-click to rotate 90 degrees; right-click to reverse\n"
                      "- Match every pipe end; the network must be a tree\n"
                      "- Dashed orange border: locked cell\n"
-                     "- Red dot: source; blue pipes: water"
+                     "- Red dot: source; blue pipes: water\n"
+                     "- Q/E: rotate selected pipe\n"
+                     "- F or Shift+click: flag/unflag\n"
+                     "- Ctrl+click: select without rotating\n"
+                     "- Purple flags are your notes"
             )
             wrap_note = " - wrap-around (dashed purple border)" if self.problem.wrap else ""
             self.status.set(f"Pipes {self.problem.rows}x{self.problem.cols}{wrap_note}: click a cell to rotate its pipe.")
@@ -482,6 +565,11 @@ class MainWindow:
             ttk.Button(self.number_pad, text=str(value), width=2, command=lambda v=value: self._enter_value(v)).pack(side="left", padx=1)
         if size:
             ttk.Button(self.number_pad, text="Clear", command=lambda: self._enter_value(0)).pack(side="left", padx=(4, 1))
+        else:
+            self.input_label.configure(text="Pipe:")
+            ttk.Button(self.number_pad, text="Rotate CCW (Q)", command=lambda: self.rotate_selected_pipe(-1)).pack(side="left", padx=2)
+            ttk.Button(self.number_pad, text="Rotate CW (E)", command=lambda: self.rotate_selected_pipe(1)).pack(side="left", padx=2)
+        self._install_shortcuts(self.number_pad)
 
     def _replace_canvas(self) -> None:
         self.canvas.destroy()
@@ -493,6 +581,7 @@ class MainWindow:
         self.canvas.bind("<Button-1>", self._on_click)
         self.canvas.bind("<Button-2>", lambda event: self._on_click(event, reverse=True))
         self.canvas.bind("<Button-3>", lambda event: self._on_click(event, reverse=True))
+        self._install_shortcuts(self.canvas)
 
     def _draw(self) -> None:
         if self.problem is not None and self.current_state is not None and hasattr(self.canvas, "draw"):
@@ -502,6 +591,7 @@ class MainWindow:
                 "conflicts": self.conflicts,
             }
             if isinstance(self.canvas, PipesCanvas):
+                kwargs["flags"] = getattr(self, "flags", set())
                 kwargs["water"] = pipes_water(self.problem, self.current_state)
             else:
                 kwargs["active_cell"] = self.active_cell
@@ -514,11 +604,94 @@ class MainWindow:
                     else set()
                 )
             self.canvas.draw(self.problem, self.current_state, **kwargs)
+        self._update_flag_controls()
+
+    def _search_busy(self) -> bool:
+        controller = getattr(self, "controller", None)
+        if controller is None:
+            return False
+        events = getattr(controller, "events", None)
+        return controller.state.running or (events is not None and not events.empty())
+
+    def _update_flag_controls(self) -> None:
+        if not self._is_pipes() or not hasattr(self, "flag_button"):
+            return
+        flags = getattr(self, "flags", set())
+        busy = self._search_busy()
+        selected = self.selected is not None and self.current_state is not None and bool(self.current_state[self.selected])
+        self.flag_button.configure(
+            text=action_label("Unflag" if self.selected in flags else "Flag", "toggle_flag"),
+            state="normal" if selected and not busy else "disabled",
+        )
+        self.clear_flags_button.configure(state="normal" if flags and not busy else "disabled")
+        self.flag_count.set(f"Flags: {len(flags)} (your notes)")
+        self.algorithm_combo.configure(state="disabled" if busy else "readonly")
+
+    def _append_history(self, state: tuple[int, ...]) -> None:
+        if not self._is_pipes():
+            self.history.append(state)
+            return
+        if not hasattr(self, "flag_history") or len(self.flag_history) != len(self.history):
+            self.flag_history = [set() for _ in self.history]
+        self.history.append(state)
+        self.flag_history.append(set(getattr(self, "flags", set())))
+
+    def toggle_flag(self) -> None:
+        if not self._is_pipes():
+            return
+        if self._search_busy():
+            self._set_status("Cancel the search before editing player flags.", kind="warning")
+            return
+        if self.current_state is None or self.selected is None:
+            self._set_status("Select a cell first. Shift+click can flag a cell directly.", kind="warning")
+            return
+        if not self.current_state[self.selected]:
+            self._set_status("Reset the board before flagging an unassigned pipe.", kind="warning")
+            self._draw()
+            return
+        if self.selected in self.flags:
+            self.flags.remove(self.selected)
+            message = "Player flag removed."
+        else:
+            self.flags.add(self.selected)
+            message = "Player flag added. This is your note, not a verified answer."
+        self._append_history(self.current_state)
+        self._set_status(message, kind="info")
+        self._draw()
+
+    def clear_flags(self) -> None:
+        if not self._is_pipes():
+            return
+        if self._search_busy() or not self.flags:
+            return
+        self.flags = set()
+        self._append_history(self.current_state)
+        self._set_status("All player flags cleared.", kind="info")
+        self._draw()
+
+    def rotate_selected_pipe(self, turns: int) -> None:
+        if self.problem is None or hasattr(self.problem, "size") or self.current_state is None:
+            return
+        if self._search_busy():
+            self._set_status("Cancel the search before rotating pipes manually.", kind="warning")
+            return
+        if self.selected is None:
+            self._set_status("Select a pipe with Ctrl+click before rotating it.", kind="warning")
+            return
+        if self.problem.is_locked(self.selected):
+            self._set_status("This cell is locked and cannot be rotated.", kind="warning")
+            self._draw()
+            return
+        self._clear_domain_state()
+        self._remember(rotate_pipe(self.problem, self.current_state, self.selected, turns))
+        self._set_status("Pipe rotated. Press 'Check (C)' when the network is fully connected.", kind="info")
 
     def _remember(self, new_state: tuple[int, ...]) -> None:
         if new_state != self.current_state:
+            if self._is_pipes():
+                self.flags = {index for index in getattr(self, "flags", set()) if new_state[index] == self.current_state[index]}
             self.current_state = new_state
-            self.history.append(new_state)
+            self._append_history(new_state)
             self.conflicts = set()
             self.solved = False
             self._draw()
@@ -532,6 +705,13 @@ class MainWindow:
             return
         self._clear_domain_state()
         self.selected = index
+        modifiers = getattr(event, "state", 0)
+        if self._is_pipes() and modifiers & 0x0001:
+            self.toggle_flag()
+            return
+        if self._is_pipes() and modifiers & 0x0004:
+            self._draw()
+            return
         if hasattr(self.problem, "size"):
             if self.problem.givens[index]:
                 self._set_status("Gray cells contain given numbers and cannot be edited.", kind="warning")
@@ -539,14 +719,11 @@ class MainWindow:
                 self._set_status(f"Cell at row {index // self.problem.size + 1}, column {index % self.problem.size + 1}: enter 1-{self.problem.size}.", kind="info")
                 self._draw()
         else:
-            if self.problem.is_locked(index):
-                self._set_status("This cell is locked and cannot be rotated.", kind="warning")
-                self._draw()
-                return
-            self._remember(rotate_pipe(self.problem, self.current_state, index, -1 if reverse else 1))
-            self._set_status("Pipe rotated. Press 'Check' when the network is fully connected.", kind="info")
+            self.rotate_selected_pipe(-1 if reverse else 1)
 
-    def _on_key(self, event) -> None:
+    def _on_futoshiki_key(self, event) -> None:
+        if self._is_pipes():
+            return
         if isinstance(event.widget, (ttk.Entry, tk.Entry)):
             return
 
@@ -575,6 +752,67 @@ class MainWindow:
         else:
             return
         self._enter_value(value)
+
+    def _install_shortcuts(self, widget) -> None:
+        tag = getattr(self, "_shortcut_tag", None)
+        if tag is None:
+            return
+        widget.bindtags((tag, *(name for name in widget.bindtags() if name != tag)))
+        for child in widget.winfo_children():
+            self._install_shortcuts(child)
+
+    def _on_key_release(self, event):
+        if not self._is_pipes():
+            return
+        key = event.keysym.lower()
+        if key in self._shortcut_keys_down:
+            self._shortcut_keys_down.discard(key)
+            return "break"
+
+    def _on_key(self, event):
+        if not self._is_pipes():
+            return
+        key = event.keysym.lower()
+        modifiers = getattr(event, "state", 0)
+        ctrl, shift = bool(modifiers & 0x0004), bool(modifiers & 0x0001)
+        editor = isinstance(event.widget, (ttk.Entry, tk.Entry, tk.Text))
+        action = None
+        if ctrl and key in {"o", "l"}:
+            action = self.browse if key == "o" else self.load
+        elif editor or modifiers & 0x0008:
+            return
+        elif ctrl:
+            if key == "f" and shift:
+                action = self.clear_flags
+            elif key == "z":
+                action = self.back
+            elif key == "r":
+                action = self.reset
+        else:
+            action = {
+                "space": self.toggle_pause, "right": self.step, "s": self.step,
+                "return": self.run, "kp_enter": self.run, "escape": self.cancel_search,
+                "c": self.check, "h": self.hint, "f": self.toggle_flag,
+                "q": lambda: self.rotate_selected_pipe(-1), "e": lambda: self.rotate_selected_pipe(1),
+                "a": self.cycle_algorithm,
+                "plus": lambda: self.change_speed(0.25), "equal": lambda: self.change_speed(0.25),
+                "kp_add": lambda: self.change_speed(0.25), "minus": lambda: self.change_speed(-0.25),
+                "kp_subtract": lambda: self.change_speed(-0.25),
+            }.get(key)
+        if action is not None:
+            if not hasattr(self, "_shortcut_keys_down"):
+                self._shortcut_keys_down = set()
+            self._shortcut_keys_down.add(key)
+            action()
+            return "break"
+
+    def cycle_algorithm(self) -> None:
+        if not self._search_busy():
+            self.algorithm.set("gbfs" if self.algorithm.get() == "dfs" else "dfs")
+            self._on_algorithm_change()
+
+    def change_speed(self, amount: float) -> None:
+        self.speed.set(min(4.0, max(0.25, self.speed.get() + amount)))
 
     def _enter_value(self, value: int) -> None:
         if self.problem is None or self.current_state is None or self.selected is None or not hasattr(self.problem, "size"):
@@ -610,6 +848,8 @@ class MainWindow:
         self._draw()
 
     def _get_solution(self) -> tuple[int, ...] | None:
+        if self._is_pipes() and self.solution is not None:
+            return self.solution
         if self.solution is None and self.problem is not None:
             result = solve(self.problem, "gbfs", timeout=10, detailed_events=False)
             if result.status == "solved":
@@ -618,6 +858,9 @@ class MainWindow:
 
     def hint(self) -> None:
         if self.problem is None or self.current_state is None:
+            return
+        if self._is_pipes() and self._search_busy():
+            self._set_status("Cancel the search before applying a hint.", kind="warning")
             return
         solution = self._get_solution()
         if solution is None:
@@ -664,6 +907,8 @@ class MainWindow:
             self.resume_search()
             return
         self.history = []
+        self.flags = set()
+        self.flag_history = []
         self.conflicts = set()
         self._clear_domain_state()
         self.solved = False
@@ -675,6 +920,8 @@ class MainWindow:
             return
         if not self.controller.state.running:
             self.history = []
+            self.flags = set()
+            self.flag_history = []
             self.conflicts = set()
             self._clear_domain_state()
             self.solved = False
@@ -688,7 +935,15 @@ class MainWindow:
         self._draw()
 
     def back(self) -> None:
+        if self._is_pipes() and self._search_busy():
+            self._set_status("Cancel the search before undoing player actions.", kind="warning")
+            return
         if len(self.history) > 1:
+            if self._is_pipes():
+                if len(getattr(self, "flag_history", [])) != len(self.history):
+                    self.flag_history = [set() for _ in self.history]
+                self.flag_history.pop()
+                self.flags = set(self.flag_history[-1])
             self.history.pop()
             self.current_state = self.history[-1]
             self.conflicts = set()
@@ -702,6 +957,8 @@ class MainWindow:
         if self.problem is not None:
             self.current_state = initial_play_state(self.problem)
             self.history = [self.current_state]
+            self.flags = set()
+            self.flag_history = [set()]
             self.selected = None
             self._clear_domain_state()
             self.conflicts = set()
@@ -763,7 +1020,7 @@ class MainWindow:
             self._draw()
         elif event.state is not None and event.type in {EventType.STARTED, EventType.NODE_EXPANDED, EventType.GOAL_FOUND}:
             self.current_state = event.state
-            self.history.append(event.state)
+            self._append_history(event.state)
             self.solved = event.type == EventType.GOAL_FOUND
             self.active_kind = None
             if event.type == EventType.NODE_EXPANDED and event.action is not None and hasattr(event.action, "__getitem__"):
@@ -804,6 +1061,7 @@ class MainWindow:
 
     def _poll(self) -> None:
         self.controller.poll(self._handle_event, limit=1)
+        self._update_flag_controls()
         delay = max(20, int(150 / max(0.1, self.speed.get())))
         self.root.after(delay, self._poll)
 

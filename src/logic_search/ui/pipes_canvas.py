@@ -4,6 +4,7 @@ import tkinter as tk
 from math import asin, cos, pi, sin
 
 from logic_search.puzzles.pipes.model import E, N, S, W, BASE_MASKS, rotate_mask
+from .player_flags import draw_player_flag
 
 BG = "#e9e9ea"
 DOT = "#c7c7ca"
@@ -113,10 +114,12 @@ class PipesCanvas(tk.Canvas):
         selected: int | None = None,
         conflicts: set[int] | None = None,
         water: set[int] | None = None,
+        flags: set[int] | None = None,
     ) -> None:
         self.delete("all")
         conflicts = conflicts or set()
         water = water or set()
+        flags = flags or set()
         source = getattr(problem, "source_index", 0)
         width = max(1, self.winfo_width())
         height = max(1, self.winfo_height())
@@ -172,3 +175,5 @@ class PipesCanvas(tk.Canvas):
             if index == source:
                 r = cell * 0.065
                 self.create_oval(cx - r, cy - r, cx + r, cy + r, fill=SOURCE, outline="")
+            if index in flags:
+                draw_player_flag(self, x0, y0, cell)

@@ -121,6 +121,8 @@ Lệnh chỉ có `-h` / `--help`, không có flag cấu hình. Khi mở, GUI n�
 | Từng bước / Hủy | Phát từng event hoặc hủy tìm kiếm. |
 | Tốc độ | Điều chỉnh tốc độ hiển thị từ `0.25` đến `4.0`. |
 
+Riêng trò Pipes, cờ đánh dấu do người chơi tự đặt và các phím tắt mới được mô tả trong [hướng dẫn cờ đánh dấu và phím tắt](docs/PLAYER_FLAGS.md). Cờ không xác nhận ô đúng và không ràng buộc thuật toán.
+
 ## 4. Benchmark và tổng hợp kết quả
 
 ### `benchmark`
