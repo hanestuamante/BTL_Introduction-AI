@@ -894,7 +894,7 @@ class MainWindow:
         self._draw()
 
     def _get_solution(self) -> tuple[int, ...] | None:
-        if self._is_pipes() and self.solution is not None:
+        if self.solution is not None:
             return self.solution
         if self.solution is None and self.problem is not None:
             result = solve(self.problem, "gbfs", timeout=10, detailed_events=False)
