@@ -142,6 +142,10 @@ class FutoshikiProblem:
         return tuple(values)
 
     def is_goal(self, state: FutoshikiState) -> bool:
+        if len(state) != self.size * self.size:
+            return False
+        if any(given and state[i] != given for i, given in enumerate(self.givens)):
+            return False
         if 0 in state or not self.is_consistent(state):
             return False
         expected = set(range(1, self.size + 1))
