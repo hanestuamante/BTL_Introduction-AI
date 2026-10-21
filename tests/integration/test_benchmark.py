@@ -50,3 +50,26 @@ def test_failed_memory_run_is_not_attached_as_solved_memory(monkeypatch):
     assert rows[0]["memory_status"] == "timeout"
     assert rows[0]["peak_python_memory_kib"] is None
     assert rows[0]["memory_scope"] == "search_python_allocations"
+
+
+def test_cli_benchmark_records_input_and_manifest_provenance(tmp_path, monkeypatch):
+    import hashlib
+    import json
+    from logic_search import cli
+    from logic_search.benchmark import runner
+
+    path = ROOT / "data/futoshiki/futoshiki-4x4-easy-seed-201.json"
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({"inputs": [{"path": str(path)}]}))
+    monkeypatch.setattr(runner, "run_isolated", lambda *a, **kw: {"status": "solved", "runtime_ms": 1})
+    output = tmp_path / "results.json"
+    assert cli.main(["benchmark", "--manifest", str(manifest), "--algorithms", "dfs",
+                     "--repeats", "1", "--timeout", "5", "--csv", str(tmp_path / "out.csv"),
+                     "--json", str(output)]) == 0
+    row = json.loads(output.read_text())[0]
+    assert row["manifest_sha256"] == hashlib.sha256(manifest.read_bytes()).hexdigest()
+    assert row["input_sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert row["benchmark_timeout_s"] == 5
+    assert row["benchmark_repeats"] == 1
+    assert len(row["source_sha256"]) == 64
+    assert row["git_worktree_dirty"] in {"true", "false"}

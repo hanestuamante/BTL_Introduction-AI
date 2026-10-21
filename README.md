@@ -205,11 +205,15 @@ python scripts/generate_pipes_inputs.py \
 
 Manifest đầu ra liệt kê đợt vừa sinh. Khi sinh nhiều mức, dùng `--count` không quá 100 để tránh trùng dải seed.
 
-## 6. Số liệu kết quả
+## 6. Số liệu kết quả lịch sử — commit được ghi nhận `7a80ea9`
+
+Bảng dưới đây và các biểu đồ trong `results/charts/` thuộc đợt đo ghi commit `7a80ea9`, **không phải benchmark của phiên bản code hiện tại**. Solver và heuristic đã thay đổi sau commit đó. Raw cũ không lưu trạng thái working tree hoặc checksum mã nguồn, nên commit không chứng minh toàn bộ nội dung mã đã chạy. Xem [nguồn gốc bộ kết quả](results/README.md).
 
 Số liệu lấy từ `results/tables/summary.csv`: 18 đề × 2 thuật toán × 10 lượt = **360 lượt timing**, tất cả giải thành công. Mỗi cặp đề/thuật toán có 1 lượt warm-up, 10 lượt timing và 1 lượt memory riêng; mỗi nhóm dưới đây có 30 lượt timing và 3 mẫu memory.
 
 Thời gian và node là median trên các lượt giải thành công. Memory là median của peak cấp phát Python trong `solve()`, đo bằng `tracemalloc` sau khi nạp input. Thông tin máy và phiên bản Python của từng lượt nằm trong raw results.
+
+Các lượt benchmark mới ghi thêm full commit, `git_worktree_dirty`, `source_sha256` của các file Python trong package, `manifest_sha256`, `input_sha256`, `benchmark_timeout_s` và `benchmark_repeats`. CLI tính hash từ chính manifest đã đọc; API `run_benchmark` không được truyền hash manifest ghi `unknown`. Metadata lấy Git của thư mục mã nguồn thay vì Git của thư mục gọi lệnh. Để đánh giá phiên bản hiện tại, chốt code rồi chạy benchmark vào thư mục mới và tổng hợp lại; mỗi nhóm chỉ có 3 đề độc lập, không phải 30 đề.
 
 | Puzzle | Kích thước | Độ khó | Thuật toán | Solved / lượt | Median thời gian (ms) | Median memory (KiB) | Median node mở rộng |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: |

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -33,13 +34,17 @@ def _solve(args: argparse.Namespace) -> int:
 def _benchmark(args: argparse.Namespace) -> int:
     try:
         manifest_path = Path(args.manifest)
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest_bytes = manifest_path.read_bytes()
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
         entries = manifest["inputs"] if isinstance(manifest, dict) else manifest
         for entry in entries:
             candidate = Path(entry["path"])
             if not candidate.is_absolute():
                 entry["path"] = str((manifest_path.parent / candidate).resolve())
-        records = run_benchmark(entries, args.algorithms, args.repeats, args.timeout)
+        records = run_benchmark(
+            entries, args.algorithms, args.repeats, args.timeout,
+            manifest_sha256=hashlib.sha256(manifest_bytes).hexdigest(),
+        )
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
         print(f"Benchmark error: {exc}", file=sys.stderr)
         return 2
