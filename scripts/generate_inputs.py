@@ -43,7 +43,7 @@ def main() -> int:
     parser.add_argument("--lock-ratio", type=float, default=0.0, help="Tỷ lệ ô bị khóa (0.0 đến 1.0, cho Pipes)")
     args = parser.parse_args()
 
-    # Chế độ sinh tùy chỉnh nếu có tham số đặc biệt
+    # Use custom generation mode when specific options are supplied
     is_custom = (
         args.puzzle is not None
         or args.size is not None
@@ -71,7 +71,7 @@ def main() -> int:
                 )
                 path = args.output / "futoshiki" / f"{data['id']}.json"
                 write_stable(path, data)
-                print(f"[Futoshiki] Đã sinh {data['id']} (size={size}, blank_ratio={data['metadata'].get('blank_ratio')}) -> {path}", flush=True)
+                print(f"[Futoshiki] Generated {data['id']} (size={size}, blank_ratio={data['metadata'].get('blank_ratio')}) -> {path}", flush=True)
 
         if target_puzzle in {"pipes", "all"}:
             rows = args.rows or args.size or 6
@@ -91,15 +91,15 @@ def main() -> int:
                 )
                 path = args.output / "pipes" / f"{data['id']}.json"
                 write_stable(path, data)
-                print(f"[Pipes] Đã sinh {data['id']} (rows={rows}, cols={cols}, wrap={wrap}) -> {path}", flush=True)
+                print(f"[Pipes] Generated {data['id']} (rows={rows}, cols={cols}, wrap={wrap}) -> {path}", flush=True)
         return 0
 
-    # Chế độ mặc định: sinh toàn bộ bộ đề benchmark và cập nhật benchmark_manifest.json
+    # Default mode: generate the full benchmark dataset and update benchmark_manifest.json
     manifest_path = args.output / "benchmark_manifest.json"
     previous = json.loads(manifest_path.read_text()) if manifest_path.exists() else {"inputs": []}
     retained = [entry for entry in previous["inputs"] if entry["path"].startswith("futoshiki/")] if args.pipes_only else []
     generated = []
-    for size in (6, 7, 8):
+    for size in (5, 6, 7, 8):
         for offset in range(3):
             seed = size * 100 + 1 + offset
             data = generate_pipes(size, size, seed, difficulty="hard", wrap=True, candidates=24)

@@ -47,6 +47,21 @@
     },
     {
       "difficulty": "hard",
+      "path": "pipes/pipes-5x5-hard-wrap-seed-501.json",
+      "sha256": "0606b7fb66163ef91707a9b8f373b991524ea9e89525983860a1ee7ecf632f76"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-5x5-hard-wrap-seed-502.json",
+      "sha256": "6af957341760b0324a100954e2045924fcc951b0e6c402057008caa8df5b6adf"
+    },
+    {
+      "difficulty": "hard",
+      "path": "pipes/pipes-5x5-hard-wrap-seed-503.json",
+      "sha256": "33a905f9032466f4f998ea8b53157b44735106ad85140b9edbfe11cae0c71b6e"
+    },
+    {
+      "difficulty": "hard",
       "path": "pipes/pipes-6x6-hard-wrap-seed-601.json",
       "sha256": "2dcd3ff940cfdb44aef446b9033d5477f789598618c6b66aace7c3f547d9d28a"
     },

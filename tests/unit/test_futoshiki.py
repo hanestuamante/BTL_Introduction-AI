@@ -31,6 +31,25 @@ def test_goal_validation():
     assert validate_solution(problem, solution)
 
 
+def test_goal_rejects_latin_square_that_changes_a_given():
+    problem = parse_futoshiki({
+        "schema_version": 1, "puzzle": "futoshiki", "id": "given-check",
+        "size": 2, "givens": [[1, 0], [0, 0]],
+    })
+    assert problem.is_goal((1, 2, 2, 1))
+    assert not problem.is_goal((2, 1, 1, 2))
+    assert not validate_solution(problem, (2, 1, 1, 2))
+
+
+@pytest.mark.parametrize("state", [(), (1, 2, 2), (1, 2, 2, 1, 1)])
+def test_goal_rejects_wrong_state_length(state):
+    problem = parse_futoshiki({
+        "schema_version": 1, "puzzle": "futoshiki", "id": "length-check",
+        "size": 2, "givens": [[1, 0], [0, 0]],
+    })
+    assert not problem.is_goal(state)
+
+
 def test_actions_emits_micro_events():
     from logic_search.core.events import EventEmitter, EventType
 

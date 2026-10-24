@@ -54,7 +54,7 @@ def parse_pipes(data: dict[str, Any]) -> PipesProblem:
         for col in range(cols):
             tile = tiles[row][col]
             rotation = rotations[row][col]
-            if tile not in BASE_MASKS:
+            if not isinstance(tile, str) or tile not in BASE_MASKS:
                 _fail(f"tiles[{row}][{col}]", f"unknown tile {tile!r}")
             if not isinstance(rotation, int) or isinstance(rotation, bool) or not 0 <= rotation <= 3:
                 _fail(f"initial_rotations[{row}][{col}]", "must be an integer in 0..3")

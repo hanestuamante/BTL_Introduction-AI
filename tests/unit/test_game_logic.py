@@ -42,3 +42,38 @@ def test_pipes_player_rotation_and_conflict_detection():
     assert not pipes_conflicts(problem, state)
     broken = rotate_pipe(problem, state, 0)
     assert pipes_conflicts(problem, broken)
+
+
+def test_futoshiki_hints_reuse_solution_after_repeated_hints_and_reset(monkeypatch):
+    from types import SimpleNamespace
+    from logic_search.ui import main_window
+
+    window = object.__new__(main_window.MainWindow)
+    window.problem = futoshiki()
+    original = initial_play_state(window.problem)
+    window.current_state = original
+    window.history = [original]
+    window.solution = None
+    window.controller = SimpleNamespace(cancel=lambda: None)
+    window._clear_domain_state = lambda: None
+    window._draw = lambda: None
+    messages = []
+    window._set_status = lambda message, **kwargs: messages.append(message)
+    real_solve = main_window.solve
+    calls = []
+
+    def counted_solve(*args, **kwargs):
+        calls.append(1)
+        return real_solve(*args, **kwargs)
+
+    monkeypatch.setattr(main_window, "solve", counted_solve)
+    window.hint()
+    first = window.current_state
+    window.hint()
+    assert sum(a != b for a, b in zip(original, first)) == 1
+    assert sum(a != b for a, b in zip(first, window.current_state)) == 1
+    assert messages[-1].startswith("Hint:")
+    window.reset()
+    window.hint()
+    assert window.current_state == first
+    assert len(calls) == 1

@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,8 +24,9 @@ def main() -> int:
         print(f"Invalid manifest: {exc}", file=sys.stderr)
         return 1
     entries = manifest.get("inputs", [])
-    if len(entries) < 18:
-        errors.append(f"Manifest has {len(entries)} inputs; expected at least 18")
+    if len(entries) < 21:
+        errors.append(f"Manifest has {len(entries)} inputs; expected at least 21")
+    groups: Counter[tuple[str, int, str]] = Counter()
     ids: set[str] = set()
     for entry in entries:
         path = manifest_path.parent / entry["path"]
@@ -35,6 +37,10 @@ def main() -> int:
             if digest != entry.get("sha256") and hashlib.sha256(raw_bytes).hexdigest() != entry.get("sha256"):
                 errors.append(f"Checksum mismatch: {path}")
             problem = load_problem(path)
+            puzzle = "futoshiki" if hasattr(problem, "size") else "pipes"
+            size = problem.size if puzzle == "futoshiki" else problem.rows if problem.rows == problem.cols else 0
+            difficulty = (problem.metadata or {}).get("difficulty", entry.get("difficulty", "unknown"))
+            groups[(puzzle, size, difficulty)] += 1
             if problem.puzzle_id in ids:
                 errors.append(f"Duplicate ID: {problem.puzzle_id}")
             ids.add(problem.puzzle_id)
@@ -44,6 +50,12 @@ def main() -> int:
                 errors.append(f"Expected one solution, got {solutions}: {path}")
         except Exception as exc:
             errors.append(f"{path}: {exc}")
+    expected = [("futoshiki", 4, "easy"), ("futoshiki", 5, "medium"), ("futoshiki", 6, "hard")]
+    expected.extend(("pipes", size, "hard") for size in (5, 6, 7, 8))
+    for puzzle, size, difficulty in expected:
+        count = groups[(puzzle, size, difficulty)]
+        if count < 3:
+            errors.append(f"Expected at least 3 {puzzle} {size}x{size} {difficulty} inputs, got {count}")
     if errors:
         print("Submission validation failed:", file=sys.stderr)
         for error in errors:

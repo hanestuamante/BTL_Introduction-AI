@@ -25,14 +25,5 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.coverage.run]
-omit = [
-  "src/logic_search/app.py",
-  "src/logic_search/cli.py",
-  "src/logic_search/io.py",
-  "src/logic_search/ui/*",
-  "src/logic_search/benchmark/*",
-  "src/logic_search/puzzles/*/generator.py",
-  "src/logic_search/puzzles/*/heuristic.py",
-  "src/logic_search/puzzles/*/model.py",
-  "src/logic_search/puzzles/*/parser.py",
-]
+source = ["logic_search"]
+branch = true

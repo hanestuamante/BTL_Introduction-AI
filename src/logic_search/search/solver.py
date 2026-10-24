@@ -81,15 +81,15 @@ def solve(
                         if hasattr(problem, "size"):
                             r = cell // problem.size + 1
                             c = cell % problem.size + 1
-                            items.append(f"[ô({r},{c})={val}]")
+                            items.append(f"[cell({r},{c})={val}]")
                         elif hasattr(problem, "cols"):
                             r = cell // problem.cols + 1
                             c = cell % problem.cols + 1
-                            items.append(f"[ô({r},{c})={val}]")
+                            items.append(f"[cell({r},{c})={val}]")
                         else:
                             items.append(f"[{act}]")
                     elif act is None:
-                        items.append("[gốc]")
+                        items.append("[root]")
                     else:
                         items.append(f"[{act}]")
             else:
@@ -104,15 +104,15 @@ def solve(
                         if hasattr(problem, "size"):
                             r = cell // problem.size + 1
                             c = cell % problem.size + 1
-                            items.append(f"[ô({r},{c})={val}, h={h_str}]")
+                            items.append(f"[cell({r},{c})={val}, h={h_str}]")
                         elif hasattr(problem, "cols"):
                             r = cell // problem.cols + 1
                             c = cell % problem.cols + 1
-                            items.append(f"[ô({r},{c})={val}, h={h_str}]")
+                            items.append(f"[cell({r},{c})={val}, h={h_str}]")
                         else:
                             items.append(f"[{act}, h={h_str}]")
                     elif act is None:
-                        items.append(f"[gốc, h={h_str}]")
+                        items.append(f"[root, h={h_str}]")
                     else:
                         items.append(f"[{act}, h={h_str}]")
             cached_frontier = tuple(items)
@@ -146,7 +146,8 @@ def solve(
         return SearchResult(status, path, actions, metrics, message)
 
     assignment_problem = hasattr(problem, "size") and hasattr(problem, "domain")
-    domain_backtracking = visual_events and algorithm == "dfs" and assignment_problem
+    pipes_problem = hasattr(problem, "tiles") and hasattr(problem, "cols")
+    domain_backtracking = visual_events and algorithm == "dfs" and (assignment_problem or pipes_problem)
     last_expanded_id: int | None = None
     last_had_no_children: bool = False
 
@@ -190,7 +191,7 @@ def solve(
                     if anc.parent_id is not None and anc.action is not None:
                         p = nodes[anc.parent_id]
                         cell, value = anc.action if isinstance(anc.action, tuple) and len(anc.action) == 2 else (None, None)
-                        if cell is not None:
+                        if cell is not None and assignment_problem:
                             d = problem.domain(p.state, cell) if hasattr(problem, "domain") else None
                             if not d and hasattr(problem, "size"):
                                 d = tuple(range(1, problem.size + 1))
@@ -211,7 +212,7 @@ def solve(
                                     nodes_pruned=metrics.nodes_pruned,
                                     frontier_size=len(frontier) + 1,
                                     reason="dead_end",
-                                    message=f"Lùi lại: giá trị {value} tại ô hàng {r}, cột {c} không dẫn tới nghiệm, thử giá trị tiếp theo",
+                                    message=f"Backtracking: value {value} at row {r}, column {c} leads to no solution; trying the next value",
                                 )
                             else:
                                 emitter.emit(
@@ -227,7 +228,7 @@ def solve(
                                     nodes_pruned=metrics.nodes_pruned,
                                     frontier_size=len(frontier) + 1,
                                     reason="all_failed",
-                                    message=f"Lùi lại: ô hàng {r}, cột {c} đã thử hết các nhánh nhưng đều thất bại",
+                                    message=f"Backtracking: all branches for the cell at row {r}, column {c} have failed",
                                 )
                         emitter.emit(
                             EventType.BACKTRACK,
@@ -236,6 +237,8 @@ def solve(
                             state_key=problem.state_key(p.state),
                             state=p.state,
                             action=anc.action,
+                            cell=cell,
+                            value=value,
                             depth=anc.depth,
                             h=anc.h,
                             nodes_generated=metrics.nodes_generated,
@@ -313,7 +316,7 @@ def solve(
                                 nodes_pruned=metrics.nodes_pruned,
                                 frontier_size=len(frontier),
                                 reason="all_failed",
-                                message=f"Ngõ cụt: ô hàng {empty_idx // getattr(problem, 'size', 1) + 1}, cột {empty_idx % getattr(problem, 'size', 1) + 1} đã thử hết các giá trị có thể thoả nhưng đều thất bại",
+                                message=f"Dead end: all candidate values for the cell at row {empty_idx // getattr(problem, 'size', 1) + 1}, column {empty_idx % getattr(problem, 'size', 1) + 1} have failed",
                             )
                     except (ValueError, AttributeError):
                         pass
@@ -334,7 +337,7 @@ def solve(
                         nodes_pruned=metrics.nodes_pruned,
                         frontier_size=len(frontier),
                         reason="dead_end",
-                        message=f"Ngõ cụt: quay lui từ độ sâu {node.depth}",
+                        message=f"Dead end: backtracking from depth {node.depth}",
                     )
                 emitter.emit(
                     EventType.NODE_PRUNED,
@@ -388,7 +391,7 @@ def solve(
                 if anc.parent_id is not None and anc.action is not None:
                     p = nodes[anc.parent_id]
                     cell, value = anc.action if isinstance(anc.action, tuple) and len(anc.action) == 2 else (None, None)
-                    if cell is not None:
+                    if cell is not None and assignment_problem:
                         d = problem.domain(p.state, cell) if hasattr(problem, "domain") else None
                         if not d and hasattr(problem, "size"):
                             d = tuple(range(1, problem.size + 1))
@@ -407,7 +410,16 @@ def solve(
                             nodes_pruned=metrics.nodes_pruned,
                             frontier_size=0,
                             reason="all_failed",
-                            message=f"Lùi lại: ô hàng {r}, cột {c} đã thử hết các nhánh nhưng đều thất bại",
+                            message=f"Backtracking: all branches for the cell at row {r}, column {c} have failed",
+                        )
+                    if pipes_problem:
+                        emitter.emit(
+                            EventType.BACKTRACK, node_id=curr, parent_id=anc.parent_id,
+                            state_key=problem.state_key(p.state), state=p.state, action=anc.action,
+                            cell=cell, value=value, depth=p.depth, h=p.h,
+                            nodes_generated=metrics.nodes_generated, nodes_expanded=metrics.nodes_expanded,
+                            nodes_pruned=metrics.nodes_pruned, frontier_size=0,
+                            message="All child branches exhausted",
                         )
                 curr = anc.parent_id
 

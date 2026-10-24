@@ -59,7 +59,7 @@ def parse_futoshiki(data: dict[str, Any]) -> FutoshikiProblem:
         if coords[0] == coords[1]:
             _fail(f"inequalities[{i}]", "cannot reference the same cell")
         op = item.get("op")
-        if op not in {"<", ">"}:
+        if not isinstance(op, str) or op not in {"<", ">"}:
             _fail(f"inequalities[{i}].op", "must be '<' or '>'")
         if (coords[0], coords[1]) in seen:
             _fail(f"inequalities[{i}]", "duplicate relation")

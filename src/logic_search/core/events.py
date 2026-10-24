@@ -16,6 +16,7 @@ class EventType(str, Enum):
     ERROR = "ERROR"
     CELL_DOMAIN = "CELL_DOMAIN"
     VALUE_TRIED = "VALUE_TRIED"
+    VALUE_ACCEPTED = "VALUE_ACCEPTED"
     VALUE_REJECTED = "VALUE_REJECTED"
     BACKTRACK = "BACKTRACK"
 
@@ -60,6 +61,7 @@ class EventEmitter:
             EventType.NODE_PRUNED,
             EventType.CELL_DOMAIN,
             EventType.VALUE_TRIED,
+            EventType.VALUE_ACCEPTED,
             EventType.VALUE_REJECTED,
             EventType.BACKTRACK,
         }:

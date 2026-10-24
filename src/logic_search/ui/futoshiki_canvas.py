@@ -149,5 +149,5 @@ class FutoshikiCanvas(tk.Canvas):
             y = oy + (lr + rr + 1) * cell / 2
             self.create_oval(x - 11, y - 11, x + 11, y + 11, fill="white", outline="")
             vertical = lc == rc
-            symbol = ("∧" if op == "<" else "∨") if vertical and left < right else (("∨" if op == "<" else "∧") if vertical else op)
+            symbol = ("^" if op == "<" else "v") if vertical and left < right else (("v" if op == "<" else "^") if vertical else op)
             self.create_text(x, y, text=symbol, font=("TkDefaultFont", 13, "bold"), fill="#b45309")

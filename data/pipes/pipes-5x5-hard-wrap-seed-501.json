@@ -1,0 +1,116 @@
+{
+  "cols": 5,
+  "id": "pipes-5x5-hard-wrap-seed-501",
+  "initial_rotations": [
+    [
+      3,
+      3,
+      0,
+      0,
+      1
+    ],
+    [
+      3,
+      1,
+      3,
+      2,
+      2
+    ],
+    [
+      3,
+      3,
+      1,
+      3,
+      1
+    ],
+    [
+      1,
+      1,
+      2,
+      1,
+      3
+    ],
+    [
+      1,
+      0,
+      2,
+      0,
+      1
+    ]
+  ],
+  "metadata": {
+    "actual_locked_count": 0,
+    "candidates": 24,
+    "difficulty": "hard",
+    "difficulty_method": "min_expanded_plus_total_expanded_div_10",
+    "difficulty_score": 339.8,
+    "generator": "kruskal-solver-ranked-unique-v3",
+    "initial_ambiguity": 71,
+    "node_limit": 20000,
+    "requested_lock_ratio": 0.0,
+    "requested_locked_count": 0,
+    "scramble_ratio": 1.0,
+    "scrambled_cells": 25,
+    "seed": 501,
+    "solver_effort": {
+      "dfs": {
+        "max_frontier_size": 11,
+        "nodes_expanded": 282,
+        "nodes_pruned": 43,
+        "solution_depth": 25,
+        "status": "solved"
+      },
+      "gbfs": {
+        "max_frontier_size": 8,
+        "nodes_expanded": 296,
+        "nodes_pruned": 60,
+        "solution_depth": 25,
+        "status": "solved"
+      }
+    },
+    "solver_node_budget": 2000,
+    "unique_solution": true,
+    "uniqueness_nodes": 134
+  },
+  "puzzle": "pipes",
+  "rows": 5,
+  "schema_version": 1,
+  "tiles": [
+    [
+      "END",
+      "CORNER",
+      "TEE",
+      "TEE",
+      "END"
+    ],
+    [
+      "END",
+      "TEE",
+      "CORNER",
+      "CORNER",
+      "END"
+    ],
+    [
+      "END",
+      "END",
+      "STRAIGHT",
+      "CORNER",
+      "END"
+    ],
+    [
+      "TEE",
+      "TEE",
+      "CORNER",
+      "STRAIGHT",
+      "END"
+    ],
+    [
+      "TEE",
+      "END",
+      "CORNER",
+      "TEE",
+      "CORNER"
+    ]
+  ],
+  "wrap": true
+}

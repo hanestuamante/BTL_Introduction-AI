@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import multiprocessing as mp
 import queue
 import tracemalloc
@@ -48,13 +49,15 @@ def run_isolated(path: str | Path, algorithm: str, timeout: float, *, measure_me
 
 
 def run_benchmark(
-    entries: Iterable[dict[str, Any]], algorithms: Iterable[str], repeats: int, timeout: float
+    entries: Iterable[dict[str, Any]], algorithms: Iterable[str], repeats: int, timeout: float,
+    *, manifest_sha256: str | None = None,
 ) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     environment = environment_metadata()
     for entry in entries:
         path = entry["path"]
         problem = load_problem(path)
+        input_sha256 = hashlib.sha256(Path(path).read_bytes()).hexdigest()
         for algorithm in algorithms:
             run_isolated(path, algorithm, timeout)
             memory = run_isolated(path, algorithm, timeout, measure_memory=True)
@@ -69,6 +72,10 @@ def run_benchmark(
                     "seed": (problem.metadata or {}).get("seed", ""),
                     "algorithm": algorithm,
                     "repeat": repeat + 1,
+                    "benchmark_repeats": repeats,
+                    "benchmark_timeout_s": timeout,
+                    "manifest_sha256": manifest_sha256 or "unknown",
+                    "input_sha256": input_sha256,
                     **environment,
                     **timing,
                 }
