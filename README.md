@@ -122,6 +122,8 @@ Các file ngoài mã nguồn:
 | `results/charts/runtime.svg`, `results/charts/memory.svg`, `results/charts/nodes.svg` | Mở bằng trình duyệt để xem biểu đồ thời gian, bộ nhớ và node mở rộng. |
 | `docs/ADR-001.md` | Tài liệu quyết định kiến trúc. |
 | `docs/ADR-002.md` | Sự kiện tìm kiếm, phát lại và cách tính thời gian GUI. |
+| `docs/PLAYER_FLAGS.md` | Cờ ghi chú và phím tắt khi chơi Pipes. |
+| `docs/PIPES_SEARCH.md` | Chú giải màu, thử/loại hướng và điều khiển phát lại tìm kiếm Pipes. |
 | `environment-dev.yml` | Môi trường Conda Python 3.11, Tk và dependencies phát triển. |
 | `slides/README.md` | Hướng dẫn nội dung slide. |
 | `LICENSE` | Giấy phép sử dụng mã nguồn. |
@@ -262,11 +264,13 @@ Manifest đầu ra liệt kê đợt vừa sinh. Khi sinh nhiều mức, dùng `
 
 ## 6. Số liệu kết quả — bộ 21 đề
 
-Đã đo lại toàn bộ **21 đề × 2 thuật toán × 10 lượt = 420 lượt timing**, với **420/420 lượt giải thành công**. Bộ dữ liệu gồm 9 đề Futoshiki và 12 đề Pipes Hard nối biên 5×5–8×8. Mã được đo tại commit `054bb6fcd89823e54273ced470de5ef2e05c2594`; package Python có SHA-256 `1de4e7d1eb5db91538f95b6402361eefab6c4ac81661faba0ee841d8c65ec8e1`. Các lượt đo ghi `git_worktree_dirty=false`; commit tài liệu/kết quả sau đó không thay đổi package đã đo.
+Đợt benchmark lưu sẵn có **21 đề × 2 thuật toán × 10 lượt = 420 lượt timing**, với **420/420 lượt giải thành công**. Bộ dữ liệu gồm 9 đề Futoshiki và 12 đề Pipes Hard nối biên 5×5–8×8. Mã được đo tại commit `054bb6fcd89823e54273ced470de5ef2e05c2594`; package Python có SHA-256 `1de4e7d1eb5db91538f95b6402361eefab6c4ac81661faba0ee841d8c65ec8e1`. Các lượt đo ghi `git_worktree_dirty=false`.
+
+Commit `ca97908` bổ sung trực quan hóa tìm kiếm Pipes và đã thay đổi package Python. **Chưa đo lại benchmark sau cập nhật này**; bảng dưới đây tiếp tục mô tả phiên bản `054bb6f`, không phải phép đo của mã nguồn hiện tại. Các số liệu và checksum lịch sử được giữ nguyên.
 
 Mỗi cặp đề/thuật toán có 1 warm-up, 10 timing và 1 memory riêng trong process tách biệt, timeout 60 giây mỗi lượt. Tổng cộng 42 warm-up, 420 timing và 42 memory; **42/42 lượt memory thành công**. Mỗi nhóm trong bảng có 30 timing và tối đa 3 mẫu memory độc lập. Ba seed là 3 đề độc lập; 10 lượt lặp mỗi seed đo dao động thời gian, không biến thành 30 đề độc lập.
 
-Thời gian và node là median trên timing solved. Memory là median peak cấp phát Python trong `solve()`, đo bằng `tracemalloc` sau khi nạp input; không phải RSS. Memory thất bại được loại khỏi mẫu memory và giữ nguyên trạng thái trong raw. Nguồn dữ liệu: [raw CSV](results/raw/benchmark.csv), [raw JSON](results/raw/benchmark.json), [summary](results/tables/summary.csv). [Nguồn gốc và bộ lịch sử](results/README.md); [báo cáo kiểm tra sau cập nhật](docs/VERIFICATION.md).
+Thời gian và node là median trên timing solved. Memory là median peak cấp phát Python trong `solve()`, đo bằng `tracemalloc` sau khi nạp input; không phải RSS. Memory thất bại được loại khỏi mẫu memory và giữ nguyên trạng thái trong raw. Nguồn dữ liệu: [raw CSV](results/raw/benchmark.csv), [raw JSON](results/raw/benchmark.json), [summary](results/tables/summary.csv). Xem thêm [nguồn gốc bộ kết quả và cách đo lại](results/README.md).
 
 Các bản ghi có full commit, trạng thái Git, `source_sha256`, `manifest_sha256`, `input_sha256`, `benchmark_timeout_s` và `benchmark_repeats`. API không được truyền hash manifest ghi `unknown`; CLI tính hash từ đúng bytes đã đọc. Bộ 360 lượt cũ tại commit được ghi nhận `7a80ea9` được giữ nguyên trong `results/archive/7a80ea9/`, không trộn vào số liệu mới.
 
@@ -328,6 +332,7 @@ Coverage cấu hình cho toàn bộ package, kể cả model, parser, GUI và be
 | --- | --- |
 | `tests/unit/test_dataset.py` | Checksum, cấu hình và nghiệm duy nhất của ba đề Pipes 5×5. |
 | `tests/unit/test_pipes.py` | Phép xoay, ràng buộc, parser và generator Pipes. |
+| `tests/unit/test_pipes_playback.py` | Thử/giữ/loại hướng và lý do loại, màu tìm kiếm, quay lui DFS/chuyển nhánh GBFS, phát từng bước và xóa trạng thái thử khi hủy hoặc kết thúc. |
 | `tests/unit/test_futoshiki.py` | Miền giá trị, bất đẳng thức, parser, nghiệm giữ nguyên givens và event Futoshiki. |
 | `tests/unit/test_search.py` | DFS, GBFS, frontier, event và hủy tìm kiếm. |
 | `tests/unit/test_game_logic.py` | Thao tác chơi, xung đột và gợi ý Futoshiki liên tiếp/sau Reset. |
@@ -340,3 +345,13 @@ Coverage cấu hình cho toàn bộ package, kể cả model, parser, GUI và be
 | `tests/integration/test_end_to_end.py` | Giải đề và kiểm tra nghiệm đầu cuối. |
 | `tests/integration/test_benchmark.py` | Chạy benchmark và kiểm tra dữ liệu xuất. |
 | `tests/integration/test_cli.py` | Mã thoát và lỗi input khi tile/op có kiểu hoặc giá trị không hợp lệ. |
+
+### Kiểm tra đã thực hiện cho bản trực quan hóa Pipes
+
+Phần mã nguồn được đưa vào commit `ca97908` đã được kiểm tra trong môi trường Conda cục bộ với **Python 3.10.21, Tk 8.6 và pytest 9.1.1**:
+
+- `python -m pytest -q`: **131 passed**. Kiểm thử tích hợp đối chiếu chế độ trực quan với chế độ thường cho DFS/GBFS trên đề Pipes nối biên có/không có ô khóa; đường nghiệm, action và số đo tìm kiếm khớp nhau, ngoại trừ thời gian chạy.
+- `python scripts/validate_submission.py`: **Validated 21 unique, checksummed inputs**.
+- Kiểm tra cửa sổ Tkinter ẩn: chú giải, màu thử/loại hướng, Run, Cancel, Reset, chạy lại và chuyển sang Futoshiki hoạt động. Đây chưa phải kiểm tra trực quan thủ công trên cửa sổ hiển thị.
+
+Đây là kết quả kiểm tra local của phiên bản trên, chưa phải kiểm chứng cài đặt gói trên Python 3.10. Yêu cầu phát hành trong `pyproject.toml` vẫn là **Python ≥3.11**, môi trường tái lập vẫn dùng `environment-dev.yml`. Số test có thể thay đổi ở các commit sau. Không chạy lại benchmark đầy đủ trong lần kiểm tra này.

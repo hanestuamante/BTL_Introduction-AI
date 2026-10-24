@@ -1,7 +1,8 @@
 # Cờ đánh dấu và phím tắt cho Pipes
 
-Tính năng nằm trên nhánh `feat/player-flags-shortcuts`, phát triển từ
-`chore/english-only`. Chỉ trò Pipes có các thay đổi này; giao diện, phím tắt
+Tính năng cờ ban đầu được phát triển trên nhánh `feat/player-flags-shortcuts`, từ
+`chore/english-only`, và đã được tích hợp vào nhánh `feat/pipes-5x5-benchmarks`.
+Chỉ trò Pipes có các thay đổi cờ và phím tắt này; giao diện, phím tắt
 và cách chơi Futoshiki được giữ như bản tiếng Anh. GUI dùng ASCII; cờ tím được vẽ bằng nét và đa giác,
 không phụ thuộc font hay emoji.
 
@@ -51,5 +52,7 @@ Các nút thao tác trong Pipes ghi phím tắt trong ngoặc. Khi đang nhập 
 chữ và phím chỉnh sửa giữ hành vi gốc; Ctrl+O và Ctrl+L vẫn hoạt động.
 
 Cờ là dữ liệu trong phiên chơi, không được ghi vào đề JSON hoặc kết quả benchmark.
-Solver tiếp tục dùng đề gốc. Tính năng thử nghiệm xem lý do loại hướng ống
-ở nhánh trước đã được bỏ khỏi nhánh này.
+Solver tiếp tục dùng đề gốc. Khi bấm **Run**, chương trình hiển thị hướng đang
+thử, lý do loại hướng và màu của nhánh đang xét; xem
+[hướng dẫn trực quan hóa tìm kiếm Pipes](PIPES_SEARCH.md).
+Nền tím trong tìm kiếm biểu thị ứng viên, độc lập với cờ tím do người chơi tự đặt.
