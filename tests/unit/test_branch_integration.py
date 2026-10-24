@@ -90,9 +90,20 @@ def test_wrapped_locked_pipes_keep_events_and_solution(algorithm, relative, has_
     assert problem.wrap
     assert any(problem.is_locked(i) for i in range(len(problem.tiles))) == has_locks
     assert problem.is_goal(result.path[-1])
-    assert not any(e.type in {
-        EventType.CELL_DOMAIN, EventType.VALUE_TRIED, EventType.VALUE_REJECTED, EventType.BACKTRACK,
-    } for e in events)
+    assert any(e.type == EventType.CELL_DOMAIN for e in events)
+    assert any(e.type == EventType.VALUE_TRIED for e in events)
+    assert any(e.type == EventType.VALUE_ACCEPTED for e in events)
+    assert any(e.type == EventType.VALUE_REJECTED for e in events)
+    if algorithm == "gbfs":
+        assert not any(e.type == EventType.BACKTRACK for e in events)
+    plain = solve(problem, algorithm, detailed_events=False)
+    assert result.path == plain.path and result.actions == plain.actions
+    assert {k: v for k, v in result.metrics.to_dict().items() if k != "runtime_ms"} == {
+        k: v for k, v in plain.metrics.to_dict().items() if k != "runtime_ms"
+    }
+    assert all(e.state[i] == problem.locked_mask[i]
+               for e in events if e.state is not None
+               for i in range(len(problem.tiles)) if problem.is_locked(i))
     assert sum(e.type == EventType.NODE_PRUNED for e in events) == result.metrics.nodes_pruned
     assert all(e.state_key == e.state for e in events if e.type == EventType.NODE_PRUNED)
     state = initial_play_state(problem)

@@ -21,6 +21,22 @@ SOURCE = "#dc2626"
 LOCKED_OUTLINE = "#d97706"
 SELECTED_OUTLINE = "#2563eb"
 
+# Cell backgrounds describe search; tube colors continue to describe water.
+SEARCH_STYLES = {
+    "unassigned": ("#f1f5f9", "#cbd5e1"),
+    "assigned": ("#ede9fe", "#a78bfa"),
+    "domain": ("#fef3c7", "#d97706"),
+    "trial": ("#fef3c7", "#d97706"),
+    "accepted": ("#ede9fe", "#7c3aed"),
+    "rejected": ("#fee2e2", "#dc2626"),
+    "solved": ("#dcfce7", "#16a34a"),
+}
+SEARCH_LEGEND = (
+    ("unassigned", "Unassigned"), ("trial", "Checking / trying"),
+    ("assigned", "Current branch"), ("rejected", "Rejected / dead end"),
+    ("solved", "Solved"),
+)
+
 
 class PipesCanvas(tk.Canvas):
     def cell_at(self, x: float, y: float) -> int | None:
@@ -115,6 +131,10 @@ class PipesCanvas(tk.Canvas):
         conflicts: set[int] | None = None,
         water: set[int] | None = None,
         flags: set[int] | None = None,
+        search_view: bool = False,
+        active_cell: int | None = None,
+        active_kind: str | None = None,
+        active_value: int | None = None,
     ) -> None:
         self.delete("all")
         conflicts = conflicts or set()
@@ -144,9 +164,23 @@ class PipesCanvas(tk.Canvas):
             x1, y1 = x0 + cell, y0 + cell
             cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
             mask = assigned or rotate_mask(BASE_MASKS[problem.tiles[index]], problem.initial_rotations[index])
+            is_active = search_view and index == active_cell
+            if is_active and active_value is not None:
+                mask = active_value
             is_locked = bool(getattr(problem, "is_locked", None)) and problem.is_locked(index)
-            has_water = index in water
+            has_water = index in water and (bool(assigned) or not search_view)
             is_end = problem.tiles[index] == "END"
+
+            if search_view or solved:
+                kind = "solved" if solved else "assigned" if assigned else "unassigned"
+                if is_active and not solved and active_kind in SEARCH_STYLES:
+                    kind = active_kind
+                bg, border = SEARCH_STYLES[kind]
+                self.create_rectangle(
+                    x0 + 2, y0 + 2, x1 - 2, y1 - 2, fill=bg, outline=border,
+                    width=3 if is_active and not solved else 1,
+                    tags=("search-cell", f"cell-{index}", kind),
+                )
 
             if solved:
                 outline, fill = SOLVED_OUTLINE, SOLVED_FILL
@@ -154,6 +188,8 @@ class PipesCanvas(tk.Canvas):
                 outline, fill = CONFLICT_OUTLINE, CONFLICT_FILL
             elif has_water:
                 outline, fill = BASE_OUTLINE, WATER_FILL
+            elif search_view and not assigned and not (is_active and active_value is not None):
+                outline, fill = "#94a3b8", "#e2e8f0"
             else:
                 outline, fill = BASE_OUTLINE, BASE_FILL
 

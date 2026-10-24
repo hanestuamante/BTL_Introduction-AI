@@ -44,6 +44,7 @@ class SearchController:
                 EventType.NODE_EXPANDED,
                 EventType.CELL_DOMAIN,
                 EventType.VALUE_TRIED,
+                EventType.VALUE_ACCEPTED,
                 EventType.VALUE_REJECTED,
                 EventType.NODE_PRUNED,
                 EventType.BACKTRACK,

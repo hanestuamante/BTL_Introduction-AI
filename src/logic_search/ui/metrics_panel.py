@@ -36,6 +36,7 @@ class MetricsPanel(ttk.LabelFrame):
             EventType.ERROR: "Search error",
             EventType.CELL_DOMAIN: "Checking domain",
             EventType.VALUE_TRIED: "Trying value",
+            EventType.VALUE_ACCEPTED: "Candidate kept (not confirmed)",
             EventType.VALUE_REJECTED: "Value rejected",
             EventType.BACKTRACK: "Backtracking",
         }

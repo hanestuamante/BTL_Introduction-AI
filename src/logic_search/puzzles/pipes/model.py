@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Any, Iterable
+
+from logic_search.core.events import EventType
 
 N, E, S, W = 1, 2, 4, 8
 DIRECTIONS = ((-1, 0, N, S), (0, 1, E, W), (1, 0, S, N), (0, -1, W, E))
@@ -21,6 +23,10 @@ def rotate_mask(mask: int, turns: int = 1) -> int:
 def orientations(tile: str) -> tuple[int, ...]:
     base = BASE_MASKS[tile]
     return tuple(dict.fromkeys(rotate_mask(base, turns) for turns in range(4)))
+
+
+def orientation_label(mask: int) -> str:
+    return "-".join(name for bit, name in ((N, "N"), (E, "E"), (S, "S"), (W, "W")) if mask & bit)
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +159,60 @@ class PipesProblem:
             child = self.result(state, (index, mask))
             if self.is_consistent(child):
                 valid.append((index, mask))
+        return valid
+
+    def _rejection_reason(self, state: PipesState, index: int, mask: int) -> tuple[str, str]:
+        """Explain a failed candidate only during detailed playback."""
+        for direction in DIRECTIONS:
+            neighbor = self.neighbor(index, direction)
+            bit, opposite = direction[2], direction[3]
+            if neighbor is None and mask & bit:
+                return "boundary", "a pipe end points outside the board"
+            if neighbor is not None and state[neighbor] and bool(mask & bit) != bool(state[neighbor] & opposite):
+                row, col = divmod(neighbor, self.cols)
+                return "edge_mismatch", f"does not match the pipe at row {row + 1}, column {col + 1}"
+        if self._has_assigned_cycle(state):
+            return "cycle", "creates a cycle in the assigned network"
+        for cell, assigned in enumerate(state):
+            if not assigned and not self.domain(state, cell):
+                row, col = divmod(cell, self.cols)
+                return "empty_domain", f"leaves no legal orientation at row {row + 1}, column {col + 1}"
+        return "forward_check", "leaves adjacent unassigned pipes with no compatible orientations"
+
+    def actions_with_events(self, state: PipesState, emitter: Any, **context: Any) -> Iterable[PipesAction]:
+        """Preview every distinct orientation; preserve actions() ordering and rules."""
+        try:
+            index = state.index(0)
+        except ValueError:
+            return ()
+        domain = self.domain(state, index)
+        row, col = divmod(index, self.cols)
+        location = f"row {row + 1}, column {col + 1}"
+        emitter.emit(
+            EventType.CELL_DOMAIN, state=state, state_key=self.state_key(state), cell=index, domain=domain,
+            message=f"Checking {location}: {len(domain)} locally legal orientation(s)", **context,
+        )
+        preferred = rotate_mask(BASE_MASKS[self.tiles[index]], self.initial_rotations[index])
+        candidates = sorted(orientations(self.tiles[index]), key=lambda mask: (mask != preferred, mask))
+        valid = []
+        for mask in candidates:
+            child = self.result(state, (index, mask))
+            details = dict(state=child, state_key=self.state_key(child), cell=index, value=mask,
+                           domain=domain, action=(index, mask), **context)
+            emitter.emit(EventType.VALUE_TRIED, message=f"Trying {orientation_label(mask)} at {location}", **details)
+            if mask in domain and self.is_consistent(child):
+                valid.append((index, mask))
+                emitter.emit(
+                    EventType.VALUE_ACCEPTED,
+                    message=f"Keeping {orientation_label(mask)} at {location} as a candidate; solution not yet confirmed",
+                    **details,
+                )
+            else:
+                reason, explanation = self._rejection_reason(child, index, mask)
+                emitter.emit(
+                    EventType.VALUE_REJECTED, reason=reason,
+                    message=f"Rejecting {orientation_label(mask)} at {location}: {explanation}", **details,
+                )
         return valid
 
     def result(self, state: PipesState, action: PipesAction) -> PipesState:

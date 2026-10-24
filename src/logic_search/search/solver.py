@@ -146,7 +146,8 @@ def solve(
         return SearchResult(status, path, actions, metrics, message)
 
     assignment_problem = hasattr(problem, "size") and hasattr(problem, "domain")
-    domain_backtracking = visual_events and algorithm == "dfs" and assignment_problem
+    pipes_problem = hasattr(problem, "tiles") and hasattr(problem, "cols")
+    domain_backtracking = visual_events and algorithm == "dfs" and (assignment_problem or pipes_problem)
     last_expanded_id: int | None = None
     last_had_no_children: bool = False
 
@@ -190,7 +191,7 @@ def solve(
                     if anc.parent_id is not None and anc.action is not None:
                         p = nodes[anc.parent_id]
                         cell, value = anc.action if isinstance(anc.action, tuple) and len(anc.action) == 2 else (None, None)
-                        if cell is not None:
+                        if cell is not None and assignment_problem:
                             d = problem.domain(p.state, cell) if hasattr(problem, "domain") else None
                             if not d and hasattr(problem, "size"):
                                 d = tuple(range(1, problem.size + 1))
@@ -236,6 +237,8 @@ def solve(
                             state_key=problem.state_key(p.state),
                             state=p.state,
                             action=anc.action,
+                            cell=cell,
+                            value=value,
                             depth=anc.depth,
                             h=anc.h,
                             nodes_generated=metrics.nodes_generated,
@@ -388,7 +391,7 @@ def solve(
                 if anc.parent_id is not None and anc.action is not None:
                     p = nodes[anc.parent_id]
                     cell, value = anc.action if isinstance(anc.action, tuple) and len(anc.action) == 2 else (None, None)
-                    if cell is not None:
+                    if cell is not None and assignment_problem:
                         d = problem.domain(p.state, cell) if hasattr(problem, "domain") else None
                         if not d and hasattr(problem, "size"):
                             d = tuple(range(1, problem.size + 1))
@@ -408,6 +411,15 @@ def solve(
                             frontier_size=0,
                             reason="all_failed",
                             message=f"Backtracking: all branches for the cell at row {r}, column {c} have failed",
+                        )
+                    if pipes_problem:
+                        emitter.emit(
+                            EventType.BACKTRACK, node_id=curr, parent_id=anc.parent_id,
+                            state_key=problem.state_key(p.state), state=p.state, action=anc.action,
+                            cell=cell, value=value, depth=p.depth, h=p.h,
+                            nodes_generated=metrics.nodes_generated, nodes_expanded=metrics.nodes_expanded,
+                            nodes_pruned=metrics.nodes_pruned, frontier_size=0,
+                            message="All child branches exhausted",
                         )
                 curr = anc.parent_id
 

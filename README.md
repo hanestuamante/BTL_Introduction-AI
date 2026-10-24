@@ -176,6 +176,8 @@ Lệnh chỉ có `-h` / `--help`, không có flag cấu hình. Khi mở, GUI n�
 
 Riêng trò Pipes, cờ đánh dấu do người chơi tự đặt và các phím tắt mới được mô tả trong [hướng dẫn cờ đánh dấu và phím tắt](docs/PLAYER_FLAGS.md). Cờ không xác nhận ô đúng và không ràng buộc thuật toán. Nguồn nước mặc định ở hàng 1, cột 1 (góc trên bên trái); file JSON có thể chỉ định nguồn riêng qua `source`.
 
+Khi bấm **Run** ở Pipes, nền/viền ô thể hiện trạng thái chưa gán, đang thử, ứng viên, bị loại và nghiệm. Xem [chú giải màu và cách phát từng bước tìm kiếm](docs/PIPES_SEARCH.md).
+
 ## 4. Benchmark và tổng hợp kết quả
 
 ### `benchmark`

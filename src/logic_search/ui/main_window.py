@@ -6,13 +6,14 @@ from tkinter import filedialog, messagebox, ttk
 
 from logic_search.core.events import EventType
 from logic_search.io import load_problem
+from logic_search.puzzles.pipes.model import orientation_label
 from logic_search.search.solver import solve
 
 from .controller import SearchController
 from .futoshiki_canvas import FutoshikiCanvas
 from .game_logic import futoshiki_conflicts, initial_play_state, pipes_conflicts, pipes_water, rotate_pipe, set_futoshiki_value
 from .metrics_panel import MetricsPanel
-from .pipes_canvas import PipesCanvas
+from .pipes_canvas import SEARCH_LEGEND, SEARCH_STYLES, PipesCanvas
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_INPUT = ROOT / "data/futoshiki/futoshiki-4x4-easy-seed-201.json"
@@ -263,6 +264,9 @@ class MainWindow:
         self.active_value = None
         self.cell_domains.clear()
         self.cell_rejected.clear()
+        self.pipes_search_view = False
+        self._previous_pipe_node_id = None
+        self._pipe_branch_state = None
 
     def _prune_inactive_cells(self, state: tuple[int, ...] | None, keep_cell: int | None = None) -> None:
         if state is None:
@@ -330,6 +334,20 @@ class MainWindow:
             self.step_label.configure(wraplength=max(200, event.width - 150))
 
         self.step_card.bind("<Configure>", _on_step_card_resize)
+
+        self.pipes_legend = ttk.Frame(self.canvas_host)
+        for column, (kind, label) in enumerate(SEARCH_LEGEND):
+            bg, border = SEARCH_STYLES[kind]
+            tk.Label(
+                self.pipes_legend, text=label, bg=bg, fg="#1f2937", padx=4, pady=3,
+                highlightthickness=1, highlightbackground=border,
+            ).grid(row=0, column=column, padx=2, sticky="ew")
+        ttk.Label(
+            self.pipes_legend,
+            text="Purple = assigned in this branch, not confirmed. Blue tubes = water.\n"
+                 "N / E / S / W = North / East / South / West. Step pauses at each search action.",
+            wraplength=520,
+        ).grid(row=1, column=0, columnspan=len(SEARCH_LEGEND), sticky="w", pady=(4, 0))
 
         # Board row: horizontal container for Canvas and Vertical Stack/Priority Queue Frame
         self.board_row = ttk.Frame(self.canvas_host)
@@ -524,6 +542,7 @@ class MainWindow:
         self._build_controls()
         self._replace_canvas()
         if hasattr(self.problem, "size"):
+            self.pipes_legend.pack_forget()
             if hasattr(self, "board_row"):
                 self.step_card.pack(side="top", fill="x", padx=4, pady=(2, 6), before=self.board_row)
             else:
@@ -541,6 +560,7 @@ class MainWindow:
             self.status.set(FUTOSHIKI_BOTTOM_HINT)
         else:
             self.step_card.pack_forget()
+            self.pipes_legend.pack(side="top", fill="x", padx=4, pady=(2, 6), before=self.board_row)
             if hasattr(self, "step_right_frame"):
                 self.step_right_frame.pack_forget()
             self._build_number_pad(0)
@@ -598,6 +618,10 @@ class MainWindow:
             if isinstance(self.canvas, PipesCanvas):
                 kwargs["flags"] = getattr(self, "flags", set())
                 kwargs["water"] = pipes_water(self.problem, self.current_state)
+                kwargs["search_view"] = getattr(self, "pipes_search_view", False)
+                kwargs["active_cell"] = self.active_cell
+                kwargs["active_kind"] = self.active_kind
+                kwargs["active_value"] = self.active_value
             else:
                 kwargs["active_cell"] = self.active_cell
                 kwargs["active_kind"] = self.active_kind
@@ -743,6 +767,9 @@ class MainWindow:
     def _on_click(self, event, reverse: bool = False) -> None:
         if self.problem is None or self.current_state is None:
             return
+        if self._is_pipes() and self._search_busy():
+            self._set_status("Cancel the search before editing pipes or player notes.", kind="warning")
+            return
         self.canvas.focus_set()
         index = self.canvas.cell_at(event.x, event.y)
         if index is None:
@@ -874,6 +901,9 @@ class MainWindow:
     def check(self) -> None:
         if self.problem is None or self.current_state is None:
             return
+        if self._is_pipes() and self._search_busy():
+            self._set_status("Pause or step to inspect the search; cancel it before checking your board.", kind="warning")
+            return
         if hasattr(self.problem, "size"):
             self.conflicts = futoshiki_conflicts(self.problem, self.current_state)
             incomplete = 0 in self.current_state
@@ -958,6 +988,12 @@ class MainWindow:
         self.conflicts = set()
         self._clear_domain_state()
         self.solved = False
+        if self._is_pipes():
+            self.current_state = self.problem.initial_state
+            self._pipe_branch_state = self.current_state
+            self.selected = None
+            self.pipes_search_view = True
+            self._draw()
         self._set_status(f"Running {self.algorithm.get().upper()}...", kind="info")
         self.controller.start(self.problem, self.algorithm.get())
 
@@ -971,11 +1007,24 @@ class MainWindow:
             self.conflicts = set()
             self._clear_domain_state()
             self.solved = False
+            if self._is_pipes():
+                self.current_state = self.problem.initial_state
+                self._pipe_branch_state = self.current_state
+                self.selected = None
+                self.pipes_search_view = True
+                self._draw()
             self.controller.start(self.problem, self.algorithm.get(), paused=True)
         self.controller.step()
 
     def cancel_search(self) -> None:
         self.controller.cancel()
+        if self._is_pipes() and getattr(self, "pipes_search_view", False):
+            # Discard a transient trial, then make undecided pipes playable again.
+            branch = getattr(self, "_pipe_branch_state", None) or self.problem.initial_state
+            initial = initial_play_state(self.problem)
+            self.current_state = tuple(mask or initial[i] for i, mask in enumerate(branch))
+            self.history = [self.current_state]
+            self.flag_history = [set()]
         self._clear_domain_state()
         self._set_status("Search cancelled.", kind="default", frontier_items=())
         self._draw()
@@ -1015,6 +1064,9 @@ class MainWindow:
 
     def _handle_event(self, event) -> None:
         self.metrics.update_event(event)
+        if self._is_pipes():
+            self._handle_pipes_event(event)
+            return
         if event.frontier_items is not None and hasattr(self, "queue_text"):
             if event.frontier_items:
                 self.queue_text.set("  ".join(event.frontier_items))
@@ -1105,6 +1157,73 @@ class MainWindow:
             self._set_status(f"Search finished: {msg}.", kind="default", frontier_items=event.frontier_items)
         elif event.type == EventType.ERROR:
             messagebox.showerror("Search error", event.message)
+
+    def _handle_pipes_event(self, event) -> None:
+        """Display candidate previews separately from the expanded search path."""
+        if event.type == EventType.NODE_GENERATED:
+            return
+        if event.type == EventType.STARTED:
+            self._clear_domain_state()
+            self.pipes_search_view = True
+        if event.state is not None:
+            self.current_state = event.state
+        self.active_cell = event.cell
+        self.active_value = event.value
+        self.active_kind = None
+        message = event.message
+        if event.type == EventType.CELL_DOMAIN:
+            self.active_kind = "domain"
+        elif event.type == EventType.VALUE_TRIED:
+            self.active_kind = "trial"
+        elif event.type == EventType.VALUE_ACCEPTED:
+            self.active_kind = "accepted"
+        elif event.type == EventType.VALUE_REJECTED:
+            self.active_kind = "rejected"
+        elif event.type in {EventType.STARTED, EventType.NODE_EXPANDED}:
+            self._pipe_branch_state = self.current_state
+            self._append_history(self.current_state)
+            switched = (event.type == EventType.NODE_EXPANDED
+                        and self._previous_pipe_node_id is not None
+                        and event.parent_id != self._previous_pipe_node_id)
+            if event.type == EventType.NODE_EXPANDED:
+                self._previous_pipe_node_id = event.node_id
+            if event.action is not None:
+                self.active_cell, self.active_value = event.action
+                self.active_kind = "accepted"
+                row, col = divmod(self.active_cell, self.problem.cols)
+                action = f"{orientation_label(self.active_value)} at row {row + 1}, column {col + 1}"
+                message = f"{'Switching branches; expanding' if switched else 'Expanding'} {action}"
+                if self.algorithm.get() == "gbfs":
+                    message += f" (h={event.h:g})"
+            else:
+                message = "Starting from the puzzle's locked pipes; other orientations are unassigned."
+        elif event.type in {EventType.NODE_PRUNED, EventType.BACKTRACK}:
+            if event.action is not None:
+                self.active_cell, self.active_value = event.action
+            self.active_kind = "rejected"
+            if event.type == EventType.BACKTRACK:
+                row, col = divmod(self.active_cell, self.problem.cols)
+                message = f"Backtracking: branch exhausted; undoing the pipe at row {row + 1}, column {col + 1}"
+            else:
+                message = f"Dead end: {event.message.lower()}"
+                if self.active_cell is None and 0 in self.current_state:
+                    self.active_cell = self.current_state.index(0)
+        elif event.type == EventType.GOAL_FOUND:
+            self.solved = True
+            self._append_history(self.current_state)
+            message = "Solution found: all pipes form one connected tree."
+        elif event.type == EventType.FINISHED:
+            if event.message != "solved":
+                self.current_state = self._pipe_branch_state or self.problem.initial_state
+            message = {"solved": "Solved: all pipes form one connected tree.",
+                       "unsolved": "Search finished: no solution found.",
+                       "timeout": "Search timed out.", "cancelled": "Search cancelled.",
+                       "error": "Search stopped after an error."}.get(event.message, event.message)
+        elif event.type == EventType.ERROR:
+            messagebox.showerror("Search error", event.message)
+        if message:
+            self._set_status(message)
+        self._draw()
 
     def _poll(self) -> None:
         self.controller.poll(self._handle_event, limit=1)
