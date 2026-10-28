@@ -47,7 +47,7 @@ python -c "import tkinter; print('Tk', tkinter.TkVersion)"
 
 Tkinter cần cho GUI **và toàn bộ suite tests**, vì một số test nhập các lớp canvas/cửa sổ. Các test này không mở cửa sổ và không cần display. Import các module logic chơi, controller và dùng CLI không cần Tk. Việc mở GUI cần thêm display hoạt động; `python -m tkinter` dùng để thử cửa sổ Tk trên máy desktop.
 
-Tkinter thường đi cùng Python trên Windows/macOS; trên Linux cần cài gói Tk tương ứng với đúng interpreter qua trình quản lý gói hệ thống hoặc dùng môi trường Conda ở trên. Nếu gặp `No module named pytest`, kiểm tra đã kích hoạt đúng môi trường và cài `.[dev]`. Nếu gặp lỗi thiếu `_tkinter` hoặc `libtk8.6.so`, sửa bộ cài Python/Tk và đường dẫn thư viện của môi trường; virtualenv không tự bổ sung thư viện Tk của hệ điều hành.
+Tkinter đi cùng bộ cài Python từ python.org trên Windows/macOS. Python cài qua Homebrew không có sẵn Tk; cài thêm `brew install python-tk@3.11` (đổi theo đúng phiên bản Python đang dùng) hoặc dùng môi trường Conda ở trên. Trên Linux cần cài gói Tk tương ứng với đúng interpreter qua trình quản lý gói hệ thống hoặc dùng môi trường Conda ở trên. Nếu gặp `No module named pytest`, kiểm tra đã kích hoạt đúng môi trường và cài `.[dev]`. Nếu gặp lỗi thiếu `_tkinter` hoặc `libtk8.6.so`, sửa bộ cài Python/Tk và đường dẫn thư viện của môi trường; virtualenv không tự bổ sung thư viện Tk của hệ điều hành.
 
 Các file `environment.yml` và thư mục `env/` cục bộ không phải cấu hình phát hành. Dùng `environment-dev.yml`; không dùng môi trường Python 3.10 cho project này.
 
