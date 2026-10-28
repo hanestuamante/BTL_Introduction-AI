@@ -51,6 +51,8 @@ Tkinter thường đi cùng Python trên Windows/macOS; trên Linux cần cài g
 
 Các file `environment.yml` và thư mục `env/` cục bộ không phải cấu hình phát hành. Dùng `environment-dev.yml`; không dùng môi trường Python 3.10 cho project này.
 
+`.gitattributes` buộc mọi file văn bản checkout với xuống dòng LF, kể cả trên Windows có `core.autocrlf=true`, để checksum input trong manifest và `source_sha256` của benchmark giống nhau trên mọi hệ điều hành. Bản clone có từ trước khi thêm `.gitattributes` vẫn giữ file CRLF; khi working tree sạch, chạy một lần `git rm -r --cached -q .` rồi `git reset --hard` để checkout lại toàn bộ (lệnh thứ hai ghi đè thay đổi chưa commit).
+
 ### Kiểm tra nhanh sau khi cài
 
 ```bash

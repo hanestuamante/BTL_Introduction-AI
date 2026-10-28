@@ -8,7 +8,7 @@ def test_metadata_tracks_source_changes_and_uses_source_repository(tmp_path, mon
     package = tmp_path / "src" / "logic_search"
     package.mkdir(parents=True)
     source = package / "sample.py"
-    source.write_text("VALUE = 1\n")
+    source.write_bytes(b"VALUE = 1\n")
 
     def git(*args):
         return subprocess.check_output(["git", "-C", str(tmp_path), *args], text=True).strip()
@@ -27,7 +27,7 @@ def test_metadata_tracks_source_changes_and_uses_source_repository(tmp_path, mon
     expected = hashlib.sha256(b"sample.py\0VALUE = 1\n\0").hexdigest()
     assert clean["source_sha256"] == expected
 
-    source.write_text("VALUE = 2\n")
+    source.write_bytes(b"VALUE = 2\n")
     dirty = metrics.environment_metadata()
     assert dirty["git_worktree_dirty"] == "true"
     assert dirty["git_commit"] == clean["git_commit"]
